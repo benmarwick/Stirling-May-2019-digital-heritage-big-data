@@ -1,0 +1,125 @@
+---
+title: "Community Data Science meets Digital Heritage: Controversies about World Heritage Sites in the Online Community of Wikipedia"
+---
+
+
+What countries are most represented?
+
+
+```{r}
+library("rnaturalearth")
+library("rnaturalearthdata")
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+  # get country of site from location text
+  # Laos, Czech Republic, Micronesia, Zimbabwe, South Sudan, Chad, 
+  # Central African Republic, Congo, Gabon, Cameroon, Nigeria, Bosnia and Herzegovina
+  #  Cote d'Ivoire, Sierra Leone, Guyana, Belize, 
+  country_names <-  paste(c(world$name, 
+                            "United States",
+                            "Czech Republic",
+                             "Antigua & Barbuda",
+                            "Saint Kitts and Nevis"
+                            ),
+                          collapse="|")
+
+  page_data_for_all_pages_location <- 
+    page_data_for_all_pages %>% 
+    mutate(country = str_extract(Location, 
+                                 regex(country_names, 
+                                       ignore.case=TRUE))) %>% 
+    mutate(country = case_when(
+      country == "United States" ~ "United States of America",
+      country == "Czech Republic" ~ "Czechia",
+      country == "Antigua & Barbuda" ~ "Antigua and Barb.",
+      country == "Saint Kitts and Nevis" ~ "St. Kitts and Nevis",
+      TRUE ~ as.character(country)))
+  
+
+wh_wk_country_counts <- 
+page_data_for_all_pages_location %>% 
+  count(country) %>% 
+  filter(!is.na(country))
+
+theme_nogrid <- function (base_size = 12, base_family = "") {
+  theme_bw(base_size = base_size, 
+           base_family = base_family) %+replace% 
+    theme(panel.grid = element_blank() )   
+}
+
+
+wh_wk_country_counts_hist <- 
+ggplot(wh_wk_country_counts,
+       aes(n)) +
+  geom_histogram() +
+  theme_nogrid(14)
+
+wh_wk_country_counts_bar <- 
+ggplot(wh_wk_country_counts,
+       aes(reorder(country, n),
+           n)) +
+  geom_col() +
+  coord_flip() +
+  theme_minimal(base_size = 6) +
+  xlab("")
+```
+
+
+Here's a map of countries showing which has the most WP pages for WH sites
+
+```{r}
+sf_map_data <- 
+world %>% 
+  filter(name != "Antartica") %>% 
+  left_join(wh_wk_country_counts,
+            by = c( 'name' = 'country')) %>% 
+  select(name, n, geometry) 
+
+wh_wk_country_count_map <- 
+ggplot(data = sf_map_data) +
+    geom_sf(aes(fill = n)) +
+    scale_fill_viridis_c(na.value="grey90") +
+  coord_sf() +
+  theme_minimal()
+```
+
+Combine map and histogram
+
+```{r}
+wh_wk_country_count_map +
+  annotation_custom(ggplotGrob(wh_wk_country_counts_hist), 
+                    xmin = -190, 
+                    xmax = -90, 
+                    ymin= 10, 
+                    ymax=-70) 
+```
+
+Map of the ratio of WH sites with WP pages, per country
+
+
+
+```{r}
+
+```
+
+
+
+  - length of articles http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.451.4208&rep=rep1&type=pdf 
+  - edit history to identify: diversity of contributions, 
+  - reverts in edits for spotting contentious topics https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0038869 http://www.contropedia.net/  http://wwm.phy.bme.hu/ 
+    - vandalism traces in edit history
+  - talk page length
+  - number of links in each page
+  - page views: https://www.sciencedirect.com/science/article/abs/pii/S0006320716301240 
+  - timing of edits: political events? Brexit?
+    - citations in articles: https://arxiv.org/abs/0705.2106
+  - are the citations scholarly? Archaeological? Meskell?
+    - citations to these articles: https://www.tandfonline.com/doi/full/10.1080/0194262X.2016.1206052 
+  - network analysis of editors, clusters of editors
+  - sentiment analysis of talk pages
+  - geolocation of anon editors by IP address
+  - bots and technicity https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0171774 but see https://dl.acm.org/citation.cfm?id=3134684 
+  
+  - Compare to 10000 random Wikipedia sites
+  - Compare to WH sites in media & academic literature
+  
