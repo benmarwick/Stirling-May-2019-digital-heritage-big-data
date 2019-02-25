@@ -2,6 +2,20 @@
 title: "Community Data Science meets Digital Heritage: Controversies about World Heritage Sites in the Online Community of Wikipedia"
 ---
 
+Load the data
+
+
+```{r}
+library(tidyverse)
+
+# all WH sites with WP pages (n = 584)
+page_data_for_all_pages <- readRDS("data/page_data_for_all_pages.rds")
+
+# all WH sites, with and without WP pages (n = 846)
+wh_wiki_table <- read_csv('data/wh_wiki_table.csv')
+
+```
+
 
 What countries are most represented?
 
@@ -35,6 +49,23 @@ world <- ne_countries(scale = "medium", returnclass = "sf")
       country == "Saint Kitts and Nevis" ~ "St. Kitts and Nevis",
       TRUE ~ as.character(country)))
   
+  
+wh_wiki_table_location <- 
+  wh_wiki_table %>% 
+  mutate(country = str_extract(Location, 
+                                 regex(country_names, 
+                                       ignore.case=TRUE))) %>% 
+    mutate(country = case_when(
+      country == "United States" ~ "United States of America",
+      country == "Czech Republic" ~ "Czechia",
+      country == "Antigua & Barbuda" ~ "Antigua and Barb.",
+      country == "Saint Kitts and Nevis" ~ "St. Kitts and Nevis",
+      TRUE ~ as.character(country)))
+  
+```
+
+
+```{r}
 
 wh_wk_country_counts <- 
 page_data_for_all_pages_location %>% 
@@ -47,12 +78,25 @@ theme_nogrid <- function (base_size = 12, base_family = "") {
     theme(panel.grid = element_blank() )   
 }
 
+median_number_wp_pages_per_country <- 
+  median(wh_wk_country_counts$n)
+
+estimate_mode <- function(x) {
+  d <- density(x)
+  d$x[which.max(d$y)]
+}
+
+mode_number_wp_pages_per_country <- 
+  round(estimate_mode(wh_wk_country_counts$n), 1)
 
 wh_wk_country_counts_hist <- 
 ggplot(wh_wk_country_counts,
        aes(n)) +
   geom_histogram() +
-  theme_nogrid(14)
+  annotate("text", x = 15, y = 30, 
+           label = str_glue('Median = {median_number_wp_pages_per_country} WP pages/country\nMode = {mode_number_wp_pages_per_country} WP pages/country'),
+           size = 2) +
+  theme_nogrid(12)
 
 wh_wk_country_counts_bar <- 
 ggplot(wh_wk_country_counts,
@@ -97,9 +141,57 @@ wh_wk_country_count_map +
 Map of the ratio of WH sites with WP pages, per country
 
 
-
 ```{r}
+wh_wiki_table_location_prop <- 
+wh_wiki_table_location %>% 
+  mutate(has_wp_page = ifelse(!is.na(site_page_name), 1, 0)) %>% 
+  group_by(country) %>% 
+  summarise(prop_sites_with_pages = sum(has_wp_page) / n()) %>% 
+  filter(!is.na(country))
 
+wh_wk_country_prop_hist <- 
+ggplot(wh_wiki_table_location_prop,
+       aes(prop_sites_with_pages)) +
+  geom_histogram() +
+  theme_nogrid(10)
+
+wh_wk_country_all_counts <- 
+wh_wiki_table_location %>% 
+  count(country) %>% 
+  filter(!is.na(country)) %>% 
+  left_join(wh_wiki_table_location_prop)
+
+wh_wk_country_prop_scatter <- 
+ggplot(wh_wk_country_all_counts,
+       aes(prop_sites_with_pages, n)) +
+  geom_point() +
+  coord_fixed(0.02) +
+  theme_nogrid(6)
+
+wh_wk_country_prop_scatter_marginal <- 
+ggExtra::ggMarginal(wh_wk_country_prop_scatter,
+                    type = "histogram")
+
+sf_map_data_prop <- 
+world %>% 
+  filter(name != "Antartica") %>% 
+  left_join(wh_wiki_table_location_prop,
+            by = c( 'name' = 'country')) %>% 
+  select(name, prop_sites_with_pages, geometry) 
+
+wh_wk_country_prop_map <- 
+ggplot(data = sf_map_data_prop) +
+    geom_sf(aes(fill = prop_sites_with_pages)) +
+    scale_fill_viridis_c(na.value="grey90") +
+  coord_sf() +
+  theme_minimal()
+
+wh_wk_country_prop_map +
+  annotation_custom((wh_wk_country_prop_scatter_marginal), 
+                    xmin = -190, 
+                    xmax = -90, 
+                    ymin= 10, 
+                    ymax=-70) 
 ```
 
 
