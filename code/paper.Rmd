@@ -9,22 +9,117 @@ Load the data
 library(tidyverse)
 
 # all WH sites with WP pages (n = 584)
-page_data_for_all_pages <- readRDS("data/page_data_for_all_pages.rds")
+page_data_for_all_pages <- 
+  readRDS(here::here("data", 
+                     "page_data_for_all_pages.rds"))
 
 # all WH sites, with and without WP pages (n = 846)
-wh_wiki_table <- read_csv('data/wh_wiki_table.csv')
+wh_wiki_table <- 
+  read_csv(here::here("data", 
+                      "wh_wiki_table.csv"))
 
-```
+# all WH sites according to UNESCO
+# from https://whc.unesco.org/en/syndication
+wh_unesco <- readxl::read_excel(here::here("data",
+                                           "whc-sites-2018.xls")) %>% 
+  filter(category %in% c("Cultural", "Mixed"))
 
-
-What countries are most represented?
-
-
-```{r}
 library("rnaturalearth")
 library("rnaturalearthdata")
 world <- ne_countries(scale = "medium", returnclass = "sf")
 
+# functions used more than once:
+
+estimate_mode <- function(x) {
+  d <- density(x)
+  d$x[which.max(d$y)]
+}
+
+theme_nogrid <- function (base_size = 12, base_family = "") {
+  theme_bw(base_size = base_size, 
+           base_family = base_family) %+replace% 
+    theme(panel.grid = element_blank() )   
+}
+```
+
+## Representation by country
+
+Where are the WH sites, before looking into WP
+
+```{r}
+
+wh_unesco_countries <- 
+wh_unesco %>% 
+  separate_rows(states_name_en, convert = TRUE, sep = ",") %>% 
+  mutate(country = case_when(
+    states_name_en == "Bolivia (Plurinational State of)"  ~ "Bolivia",
+    states_name_en == "Cabo Verde"  ~ "Republic of Cabo Verde",
+    states_name_en == "Czechia"  ~ "Czech Republic",
+    states_name_en == "Democratic People's Republic of Korea"  ~ "Republic of Korea",
+    states_name_en == "Gambia (the)"  ~ "The Gambia",
+    states_name_en == "Holy See"  ~ "Vatican",
+    states_name_en == "Iran (Islamic Republic of)"  ~ "Iran",
+    states_name_en == "Lao People's Democratic Republic"  ~ "Lao PDR",
+    states_name_en == "Micronesia (Federated States of)"  ~ "Federated States of Micronesia",
+    states_name_en == "Syrian Arab Republic"  ~ "Syria",
+    states_name_en == "the former Yugoslav Republic of Macedonia"  ~ "Macedonia",
+    states_name_en == "United Kingdom of Great Britain and Northern Ireland"  ~ "United Kingdom",
+    states_name_en == "United Republic of Tanzania"  ~ "Tanzania",
+    states_name_en == "United States of America"  ~ "United States",
+    states_name_en == "Venezuela (Bolivarian Republic of)"  ~ "Venezuela",
+    states_name_en == "United States of America"  ~ "United States",
+    states_name_en == "Viet Nam"  ~ "Vietnam",
+    states_name_en == "Republic of Moldova"  ~ "Moldova",
+    TRUE ~ as.character(states_name_en)
+  ))
+
+wh_unesco_countries_count <-  
+  wh_unesco_countries %>% 
+  count(country)
+
+median_number_unesco_sites_per_country <- 
+  median(wh_unesco_countries_count$n)
+
+mode_number_unesco_sites_per_country <- 
+  round(estimate_mode(wh_unesco_countries_count$n), 1)
+
+wh_unesco_country_counts_hist <- 
+ggplot(wh_unesco_countries_count,
+       aes(n)) +
+  geom_histogram() +
+  annotate("text", x = 30, y = 30, 
+           label = str_glue('Median = {median_number_unesco_sites_per_country} WH sites/country\nMode = {mode_number_unesco_sites_per_country} WH sites/country'),
+           size = 3) +
+  theme_nogrid(12)
+
+sf_map_data_unesco <- 
+world %>% 
+  left_join(wh_unesco_countries_count,
+            by = c( 'name_long' = 'country')) %>% 
+  select(name, n, geometry) %>% 
+  mutate(n = ifelse(is.na(n), 0, n)) %>% 
+  filter(name != "Antartica")
+
+wh_country_unesco_count_map <- 
+ggplot(data = sf_map_data_unesco) +
+    geom_sf(aes(fill = n), lwd = 0) +
+    scale_fill_viridis_c(na.value="grey90") +
+  coord_sf() +
+  coord_sf(ylim = c(-50, 90), datum = NA) +
+  theme_minimal()
+
+wh_country_unesco_count_map +
+  annotation_custom(ggplotGrob(wh_unesco_country_counts_hist), 
+                    xmin = -190, 
+                    xmax = -90, 
+                    ymin= 10, 
+                    ymax=-70) 
+
+```
+
+What countries are most represented?
+
+```{r}
   # get country of site from location text
   # Laos, Czech Republic, Micronesia, Zimbabwe, South Sudan, Chad, 
   # Central African Republic, Congo, Gabon, Cameroon, Nigeria, Bosnia and Herzegovina
@@ -114,22 +209,20 @@ Here's a map of countries showing which has the most WP pages for WH sites
 ```{r}
 sf_map_data <- 
 world %>% 
-  filter(name != "Antartica") %>% 
   left_join(wh_wk_country_counts,
             by = c( 'name' = 'country')) %>% 
-  select(name, n, geometry) 
+  select(name, n, geometry) %>% 
+  mutate(n = ifelse(is.na(n), 0, n)) %>% 
+  filter(name != "Antartica")
 
 wh_wk_country_count_map <- 
 ggplot(data = sf_map_data) +
-    geom_sf(aes(fill = n)) +
+    geom_sf(aes(fill = n), lwd = 0) +
     scale_fill_viridis_c(na.value="grey90") +
   coord_sf() +
+  coord_sf(ylim = c(-50, 90), datum = NA) +
   theme_minimal()
-```
 
-Combine map and histogram
-
-```{r}
 wh_wk_country_count_map +
   annotation_custom(ggplotGrob(wh_wk_country_counts_hist), 
                     xmin = -190, 
@@ -139,7 +232,6 @@ wh_wk_country_count_map +
 ```
 
 Map of the ratio of WH sites with WP pages, per country
-
 
 ```{r}
 wh_wiki_table_location_prop <- 
@@ -164,7 +256,7 @@ wh_wiki_table_location %>%
 wh_wk_country_prop_scatter <- 
 ggplot(wh_wk_country_all_counts,
        aes(prop_sites_with_pages, n)) +
-  geom_point() +
+  geom_point(alpha = 0.5) +
   coord_fixed(0.02) +
   theme_nogrid(6)
 
@@ -177,13 +269,17 @@ world %>%
   filter(name != "Antartica") %>% 
   left_join(wh_wiki_table_location_prop,
             by = c( 'name' = 'country')) %>% 
-  select(name, prop_sites_with_pages, geometry) 
+  select(name, 
+         prop_sites_with_pages, 
+         geometry)  %>% 
+  mutate(prop_sites_with_pages = ifelse(is.na(prop_sites_with_pages), 0, prop_sites_with_pages))
 
 wh_wk_country_prop_map <- 
 ggplot(data = sf_map_data_prop) +
-    geom_sf(aes(fill = prop_sites_with_pages)) +
+    geom_sf(aes(fill = prop_sites_with_pages), lwd = 0) +
     scale_fill_viridis_c(na.value="grey90") +
   coord_sf() +
+  coord_sf(ylim = c(-50, 90), datum = NA) +
   theme_minimal()
 
 wh_wk_country_prop_map +
@@ -193,6 +289,42 @@ wh_wk_country_prop_map +
                     ymin= 10, 
                     ymax=-70) 
 ```
+
+
+## Basic qualities of the WP articles about WH sites
+
+Length: correlate with ??
+number of links out/word
+number of references/word: scholarly or not
+
+## Basic qualitites of attention paid to articles
+
+number of links in
+page_views_last_n_days_total
+
+## Basic qualities of the editing process
+
+number of edits, total, prop/words
+size of edits
+divesity of editors
+
+## Locality  
+
+IP addresses
+
+## Networks
+
+editors
+
+## Controversies
+
+time between edits
+edit reverts
+talk page: length and sentiment
+
+## Technicity
+
+bots
 
 
 
