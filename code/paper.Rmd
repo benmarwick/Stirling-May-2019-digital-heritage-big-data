@@ -4,7 +4,6 @@ title: "Community Data Science meets Digital Heritage: Controversies about World
 
 Load the data
 
-
 ```{r}
 library(tidyverse)
 
@@ -293,14 +292,143 @@ wh_wk_country_prop_map +
 
 ## Basic qualities of the WP articles about WH sites
 
+```{r}
+# load the random pages
+ten_k_random_wp_pages <- readRDS(here::here("data", "random_page_data_tbl.rds"))
+
+ten_k_random_wp_pages_basic_qualities <- 
+ten_k_random_wp_pages %>% 
+  select(page_wordcount,
+         page_wikilinks_out, 
+         page_cited_items_on) %>% 
+  mutate(rnd_page_wikilinks_out_per_1k_words = page_wikilinks_out / page_wordcount * 1000,
+         rnd_page_cited_items_on_per_1k_words = page_cited_items_on / page_wordcount * 1000,
+         rnd_page_wordcount = page_wordcount) %>% 
+  select(-page_wikilinks_out,
+         -page_cited_items_on,
+         -page_wordcount) 
+
+ten_k_random_wp_pages_basic_qualities_long <- 
+  ten_k_random_wp_pages_basic_qualities %>% 
+  gather(variable, value) 
+```
+
+
 Length: correlate with ??
 number of links out/word
 number of references/word: scholarly or not
+
+```{r}
+page_data_for_all_pages_basic_qualities <- 
+page_data_for_all_pages %>% 
+  select(page_wordcount,
+         page_wikilinks_out, 
+         page_cited_items_on) %>% 
+  mutate(page_wikilinks_out_per_1k_words = page_wikilinks_out / page_wordcount * 1000,
+         page_cited_items_on_per_1k_words = page_cited_items_on / page_wordcount * 1000) %>% 
+  select(-page_wikilinks_out,
+         -page_cited_items_on)
+
+page_data_for_all_pages_basic_qualities_long <- 
+page_data_for_all_pages_basic_qualities %>% 
+  gather(variable, value) %>% 
+  bind_rows(ten_k_random_wp_pages_basic_qualities_long) %>% 
+  mutate(source = ifelse(str_detect(variable, "rnd" ), "10k Random pages", "World Heritage pages")) %>% 
+  mutate(variable = str_remove(variable, "rnd_"))
+
+# density plots
+  ggplot(page_data_for_all_pages_basic_qualities_long,
+         aes(value)) +
+  geom_density(aes(fill = source),
+               alpha = 0.3) +
+  scale_x_log10() +
+  scale_fill_viridis_d() +
+  facet_wrap( ~ variable, 
+              scales = "free") +
+  theme_minimal()
+```
+
+```{r}
+# scatterplots
+  ggplot() +
+      geom_point(data = ten_k_random_wp_pages_basic_qualities,
+             aes(rnd_page_wikilinks_out_per_1k_words,
+                 rnd_page_cited_items_on_per_1k_words,
+                 size = rnd_page_wordcount),
+             colour = "grey80",
+             alpha = 0.4) +
+  geom_point(data = page_data_for_all_pages_basic_qualities,
+             aes(page_wikilinks_out_per_1k_words,
+                 page_cited_items_on_per_1k_words,
+                 size = page_wordcount),
+             colour = "red",
+             alpha = 0.8) +
+  scale_x_log10() +
+  scale_y_log10() +
+  scale_fill_viridis_d() +
+  coord_fixed() +
+  theme_minimal()
+
+```
 
 ## Basic qualitites of attention paid to articles
 
 number of links in
 page_views_last_n_days_total
+
+```{r}
+ten_k_random_wp_pages_attent <- 
+ten_k_random_wp_pages %>% 
+  select(page_wikilinks_in, 
+         page_views_last_n_days_total) 
+
+page_data_for_all_pages_attent <- 
+page_data_for_all_pages %>% 
+  select(page_wikilinks_in, 
+         page_views_last_n_days_total) 
+
+page_data_for_all_pages %>% 
+  select( Site,
+         page_wikilinks_in, 
+         page_views_last_n_days_total)  %>% 
+  ggplot(aes(page_wikilinks_in,
+             page_views_last_n_days_total,
+             label = Site)) +
+  geom_point(alpha = 0.4) +
+    geom_text_repel(
+    data          = page_data_for_all_pages %>%  
+                           filter(page_views_last_n_days_total > 190000),
+    segment.size  = 0.2,
+    segment.color = "grey50",
+    direction     = "both"
+  ) +
+  scale_y_log10(expand = c(1, 0.05)) +
+  scale_x_log10(limits = c(1, 10000)) +
+  coord_fixed(0.5) +
+  theme_minimal() 
+
+page_data_for_all_pages_attent_long <- 
+page_data_for_all_pages_attent %>% 
+  gather(variable, value) %>% 
+  bind_rows(ten_k_random_wp_pages_attent %>% 
+              gather(variable, value) %>% 
+              mutate(variable =  str_glue('rnd_{variable}'))) %>% 
+  mutate(source = ifelse(str_detect(variable, "rnd" ), "10k Random pages", 
+                         "World Heritage pages")) %>% 
+  mutate(variable = str_remove(variable, "rnd_"))
+
+# density plots
+  ggplot(page_data_for_all_pages_attent_long,
+         aes(value)) +
+  geom_density(aes(fill = source),
+               alpha = 0.3) +
+  scale_x_log10() +
+  scale_fill_viridis_d() +
+  facet_wrap( ~ variable, 
+              scales = "free") +
+  theme_minimal()
+```
+
 
 ## Basic qualities of the editing process
 
