@@ -295,7 +295,7 @@ get_data_about_page <- function(the_page) {
     html_attr('href') %>% 
     str_remove("/wiki/") %>% 
     str_glue("https://en.wikipedia.org/w/index.php?title=",.,
-             "&limit=1000") %>% 
+             "&limit=10000") %>% 
     read_html() %>% 
     html_nodes("#mw-whatlinkshere-list li > a") %>% 
     html_attr('href') %>% 
@@ -315,7 +315,7 @@ get_data_about_page <- function(the_page) {
     html_attr('href') %>% 
     str_glue("https://en.wikipedia.org",.) %>% 
     str_replace("&action=history", 
-                "&offset=&limit=2000&action=history")
+                "&offset=&limit=10000&action=history")
 
   
   rh_date = revision_history_page %>% 
@@ -500,6 +500,9 @@ return(region_tbl_coords_links_info_flat)
 get_various_page_data_for_all_pages_safe <- 
   safely(get_various_page_data_for_all_pages, 
          otherwise = "some_problem")
+
+
+wh_wiki_table <- readr::read_csv("data/wh_wiki_table.csv")
 
 # this takes several hours
 page_data_for_all_pages <- 
