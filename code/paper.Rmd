@@ -7,6 +7,9 @@ Load the data
 ```{r}
 library(tidyverse)
 
+# load the random pages
+ten_k_random_wp_pages <- readRDS(here::here("data", "random_page_data_tbl.rds"))
+
 # all WH sites with WP pages (n = 584)
 page_data_for_all_pages <- 
   readRDS(here::here("data", 
@@ -202,7 +205,6 @@ ggplot(wh_wk_country_counts,
   xlab("")
 ```
 
-
 Here's a map of countries showing which has the most WP pages for WH sites
 
 ```{r}
@@ -293,9 +295,6 @@ wh_wk_country_prop_map +
 ## Basic qualities of the WP articles about WH sites
 
 ```{r}
-# load the random pages
-ten_k_random_wp_pages <- readRDS(here::here("data", "random_page_data_tbl.rds"))
-
 ten_k_random_wp_pages_basic_qualities <- 
 ten_k_random_wp_pages %>% 
   select(page_wordcount,
@@ -397,7 +396,7 @@ page_data_for_all_pages %>%
   geom_point(alpha = 0.4) +
     geom_text_repel(
     data          = page_data_for_all_pages %>%  
-                           filter(page_views_last_n_days_total > 190000),
+                      filter(page_views_last_n_days_total > 190000),
     segment.size  = 0.2,
     segment.color = "grey50",
     direction     = "both"
@@ -429,16 +428,138 @@ page_data_for_all_pages_attent %>%
   theme_minimal()
 ```
 
-
 ## Basic qualities of the editing process
 
 number of edits, total, prop/words
 size of edits
 divesity of editors
 
+```{r}
+revision_history_page_details <- 
+  tibble(revision_history_page_details = map(page_data_for_all_pages$page_info_t, 
+      ~.x$revision_history_page_details)) %>% 
+  mutate(Site =         page_data_for_all_pages$Site,
+         Country =      page_data_for_all_pages$country,
+         rh_n_editors = map_int(revision_history_page_details, ~n_distinct(.x$rh_user)),
+         rh_n_edits =   map_int(revision_history_page_details, ~nrow(.x)),
+         rh_user_simpson_idx = page_data_for_all_pages$rh_user_simpson_idx,
+         rh_user_bot_prop = page_data_for_all_pages$rh_user_bot_prop,
+         rh_revert_prop = page_data_for_all_pages$rh_revert_prop)
+
+# load the random pages revision histories
+ten_k_random_wp_pages_lst <- readRDS(here::here("data", "random_page_data_lst.rds"))
+
+
+
+
+ggplot(revision_history_page_details,
+       aes(rh_n_edits)) +
+  geom_histogram()
+
+```
+
+
 ## Locality  
 
 IP addresses
+
+```{r}
+
+get_ip_addresses <- function(x){
+  re <- regexpr(
+  "(?(?=.*?(\\d+\\.\\d+\\.\\d+\\.\\d+).*?)(\\1|))", 
+  x, perl = TRUE)
+regmatches(x, re)
+}
+
+# get locations from IP addresses
+library(rgeolocate)
+ip_db <- system.file("extdata","GeoLite2-Country.mmdb", package = "rgeolocate")
+
+revision_history_page_details_ip_addresses <- 
+revision_history_page_details %>% 
+  mutate(edits_from_ip_addresses = map(revision_history_page_details,
+                          ~.x %>% 
+                            filter(get_ip_addresses(rh_user) != "") %>% 
+                            mutate(ip_location = map(rh_user, 
+                                                     ~maxmind(.x, ip_db)))  %>% 
+                            unnest(ip_location))) 
+
+
+# analyse the countries of IP address vs country of WH site
+revision_history_page_details_ip_addresses_df <- 
+revision_history_page_details_ip_addresses %>% 
+  unnest(edits_from_ip_addresses) 
+
+revision_history_page_details_ip_addresses_countries <- 
+revision_history_page_details_ip_addresses_df %>% 
+  select(Site, Country, country_name, rh_n_edits ) %>% 
+  filter_all(all_vars(!is.na(.))) %>% 
+  group_by(Site, Country, rh_n_edits) %>% 
+  count(country_name) %>% 
+  mutate(prop_anon_of_all_edits = n / rh_n_edits) %>% 
+  mutate(internal_edits = ifelse(Country ==  country_name, 
+                                 TRUE, FALSE),
+         n_anon_edits_total = n) %>% 
+  left_join(revision_history_page_details_ip_addresses_df) %>% 
+  distinct(Site,  
+           Country, 
+           prop_anon_of_all_edits, 
+           internal_edits,
+           .keep_all = TRUE) %>% 
+  group_by(Site,  Country) %>% 
+  summarise(sum_prop_internal = sum(n_anon_edits_total[internal_edits]) / sum(n_anon_edits_total),
+            sum_prop_external = 1 - sum_prop_internal,
+            rh_n_edits = unique(rh_n_edits),
+            rh_n_edits_anon = sum(n_anon_edits_total),
+            prop_anon_of_all_edits = sum(n) / rh_n_edits)
+```
+
+
+```{r}
+# Histogram of proportion of anonymous edits 
+# TODO and random sites
+ggplot(revision_history_page_details_ip_addresses_countries,
+       aes(prop_anon_of_all_edits)) +
+  geom_histogram() +
+  theme_minimal()
+```
+
+```{r}
+# Histogram of proportion of all anonymous edits that come from same country as WH site
+ggplot(revision_history_page_details_ip_addresses_countries,
+       aes(sum_prop_internal)) +
+  geom_histogram() +
+  theme_minimal() 
+```
+
+
+```{r}
+ggplot(revision_history_page_details_ip_addresses_countries,
+       aes(sum_prop_internal,
+           prop_anon_of_all_edits)) +
+  geom_point() +
+  theme_minimal() +
+  coord_equal()
+
+```
+
+
+
+
+ggplot(revision_history_page_details_ip_addresses_countries, 
+       aes(sum_prop_internal, 
+           prop_anon_of_all_edits)) +
+  geom_point() +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_minimal()
+
+
+```
+
+
+
 
 ## Networks
 
