@@ -6,7 +6,7 @@ library(vegan)
 rando <- "https://en.wikipedia.org/wiki/Special:Random"
 
 # gets data about n WP pages
-n <- 10000
+n <- 100000
 random_page_data <- rerun(n, get_data_about_page_safe(rando) )
 
 # drops the pages that returned an error

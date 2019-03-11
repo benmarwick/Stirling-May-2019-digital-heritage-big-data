@@ -512,8 +512,10 @@ page_data_for_all_pages <-
 page_data_for_all_pages$result %>% 
   select_if(is.numeric)
 
+page_data_for_all_pages_result <- page_data_for_all_pages$result
+
 # save it
-saveRDS(page_data_for_all_pages$result, 
+saveRDS(page_data_for_all_pages_result, 
         'data/page_data_for_all_pages.rds')
 
 
