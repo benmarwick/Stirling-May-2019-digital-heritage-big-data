@@ -10,6 +10,9 @@ library(tidyverse)
 # load the random pages
 ten_k_random_wp_pages <- readRDS(here::here("data", "random_page_data_tbl.rds"))
 
+# load the random pages revision histories
+ten_k_random_wp_pages_lst <- readRDS(here::here("data", "random_page_data_lst.rds"))
+
 # all WH sites with WP pages (n = 584)
 page_data_for_all_pages <- 
   readRDS(here::here("data", 
@@ -445,12 +448,6 @@ revision_history_page_details <-
          rh_user_simpson_idx = page_data_for_all_pages$rh_user_simpson_idx,
          rh_user_bot_prop = page_data_for_all_pages$rh_user_bot_prop,
          rh_revert_prop = page_data_for_all_pages$rh_revert_prop)
-
-# load the random pages revision histories
-ten_k_random_wp_pages_lst <- readRDS(here::here("data", "random_page_data_lst.rds"))
-
-
-
 
 ggplot(revision_history_page_details,
        aes(rh_n_edits)) +
