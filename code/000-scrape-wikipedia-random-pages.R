@@ -6,7 +6,7 @@ library(vegan)
 rando <- "https://en.wikipedia.org/wiki/Special:Random"
 
 # gets data about n WP pages
-n <- 100000
+n <- 10000
 random_page_data <- rerun(n, get_data_about_page_safe(rando) )
 
 # drops the pages that returned an error
@@ -33,3 +33,8 @@ random_page_data_tbl %>%
   geom_histogram() +
   facet_wrap( ~ variable, scales = "free")
 
+
+
+saveRDS(random_page_data_tbl, "data/random_page_data_tbl.rds")
+
+saveRDS(random_page_data_lst, "data/random_page_data_lst.rds")

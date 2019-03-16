@@ -541,17 +541,135 @@ ggplot(revision_history_page_details_ip_addresses_countries,
 
 ```
 
+```{r}
+adjacency_list_3_cols <- 
+revision_history_page_details_ip_addresses_df %>% 
+  filter(!is.na(Country),
+         !is.na(country_name)) %>% 
+  group_by(Country, country_name) %>% 
+  count() %>% 
+  rename(to = Country,
+         from = country_name,
+         value = n) %>% 
+  ungroup() %>% 
+  mutate(from = ifelse(from == "Hashemite Kingdom of Jordan", "Jordan", from)) %>% 
+  select(from, to , value) %>% 
+  filter(value > 100) %>% 
+  left_join( revision_history_page_details_ip_addresses_df %>% 
+               select(country_name, continent_name) %>% 
+               distinct(),
+             by = c('from' = 'country_name')) %>% 
+  arrange(continent_name,  from, to) 
+
+
+adjacency_list <- 
+adjacency_list_3_cols%>% 
+  select(-continent_name)
+
+get_countries_in_continent <- function(x) {
+  
+  xx <- 
+  revision_history_page_details_ip_addresses_df %>% 
+    select(country_name, continent_name) %>% 
+    filter(continent_name == x) %>% 
+    pull(country_name) %>% 
+    unique()
+  
+  
+  xx[
+ unique( c(adjacency_list$from,
+           adjacency_list$to))
+ ]
+}
+
+africa   <- get_countries_in_continent("Africa")        
+asia    <- get_countries_in_continent("Asia")       
+europe  <-get_countries_in_continent("Europe")  
+north_america  <- get_countries_in_continent("North America")         
+oceania <-  get_countries_in_continent("Oceania") 
+south_america  <-  get_countries_in_continent("South America") 
+
+library(circlize)
+circos.clear()
+chordDiagram(adjacency_list, 
+             directional = 1,
+             direction.type = c("diffHeight", "arrows"),
+             link.arr.type = "big.arrow", 
+             diffHeight = -uh(2, "mm"),
+             annotationTrack = "grid", 
+             preAllocateTracks = list(track.height = max(0.4)))
+
+# we go back to the first track and customize sector labels
+circos.track(track.index = 1, panel.fun = function(x, y) {
+    circos.text(CELL_META$xcenter, CELL_META$ylim[1], CELL_META$sector.index, 
+        facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5))
+}, bg.border = NA) # here set bg.border to NA is important
+
+
+highlight.sector(africa, track.index = 1, col = "#00FF0040", 
+    text = "Africa", cex = 0.8, text.col = "white", niceFacing = TRUE)
+
+highlight.sector(asia, track.index = 1, col = "#0000FF40", 
+    text = "Asia", cex = 0.8, text.col = "white", niceFacing = TRUE)
+
+highlight.sector(europe, track.index = 1, col = "blue", 
+    text = "Europe", cex = 0.8, text.col = "white", niceFacing = TRUE)
+
+highlight.sector(north_america, track.index = 1, col = "orange", 
+    text = "North America", cex = 0.8, text.col = "white", niceFacing = TRUE)
+
+highlight.sector(oceania, track.index = 1, col = "purple", 
+    text = "Oceania", cex = 0.8, text.col = "white", niceFacing = TRUE)
+
+highlight.sector(south_america, track.index = 1, col = "brown", 
+    text = "South America", cex = 0.8, text.col = "white", niceFacing = TRUE)
+
+#-- 
+circos.track(track.index = 2, panel.fun = function(x, y) {
+    sector.index = get.cell.meta.data("sector.index")
+    xlim = get.cell.meta.data("xlim")
+    ylim = get.cell.meta.data("ylim")
+    circos.text(mean(xlim), mean(ylim), sector.index, cex = 0.6, niceFacing = TRUE)
+}, bg.border = NA)
 
 
 
-ggplot(revision_history_page_details_ip_addresses_countries, 
-       aes(sum_prop_internal, 
-           prop_anon_of_all_edits)) +
-  geom_point() +
-  scale_x_log10() +
-  scale_y_log10() +
-  theme_minimal()
 
+#--
+circos.clear()
+circos.par(gap.after = rep(c(rep(1, 4), 8), 3))
+
+chordDiagram(adjacency_list, annotationTrack = c("grid", "axis"),
+    preAllocateTracks = list(
+        track.height = uh(4, "mm"),
+        track.margin = c(uh(4, "mm"), 0)
+))             
+             
+circos.track(track.index = 2, panel.fun = function(x, y) {
+    sector.index = get.cell.meta.data("sector.index")
+    xlim = get.cell.meta.data("xlim")
+    ylim = get.cell.meta.data("ylim")
+    circos.text(mean(xlim), mean(ylim), sector.index, cex = 0.6, niceFacing = TRUE)
+}, bg.border = NA)
+
+highlight.sector(africa, track.index = 1, col = "red", 
+    text = "Africa", cex = 0.8, text.col = "white", niceFacing = TRUE)
+
+highlight.sector(asia, track.index = 1, col = "green", 
+    text = "Asia", cex = 0.8, text.col = "white", niceFacing = TRUE)
+
+highlight.sector(europe, track.index = 1, col = "blue", 
+    text = "Europe", cex = 0.8, text.col = "white", niceFacing = TRUE)
+
+highlight.sector(north_america, track.index = 1, col = "orange", 
+    text = "North America", cex = 0.8, text.col = "white", niceFacing = TRUE)
+
+highlight.sector(oceania, track.index = 1, col = "purple", 
+    text = "Oceania", cex = 0.8, text.col = "white", niceFacing = TRUE)
+
+highlight.sector(south_america, track.index = 1, col = "brown", 
+    text = "South America", cex = 0.8, text.col = "white", niceFacing = TRUE)
+  
 
 ```
 
