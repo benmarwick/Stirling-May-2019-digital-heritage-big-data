@@ -462,9 +462,11 @@ IP addresses
 
 ```{r}
 
+ip_regex <- "(?(?=.*?(\\d+\\.\\d+\\.\\d+\\.\\d+).*?)(\\1|))"
+
 get_ip_addresses <- function(x){
   re <- regexpr(
-  "(?(?=.*?(\\d+\\.\\d+\\.\\d+\\.\\d+).*?)(\\1|))", 
+  ip_regex, 
   x, perl = TRUE)
 regmatches(x, re)
 }
@@ -473,6 +475,109 @@ regmatches(x, re)
 library(rgeolocate)
 ip_db <- system.file("extdata","GeoLite2-Country.mmdb", package = "rgeolocate")
 
+```
+
+Do WH sites have more geographically diverse contributions?
+
+Get locations for random pages.
+
+How many IP edits on each page?
+
+```{r}
+randoms_revision_history_page_details <- 
+  map_df(ten_k_random_wp_pages_lst, 
+         ~.x$revision_history_page_details, 
+         .id = "page") 
+
+randoms_revision_history_page_details_ip <- 
+randoms_revision_history_page_details %>% 
+    mutate(is_ip_address = ifelse(get_ip_addresses(rh_user) != "", TRUE, FALSE),
+         page = as.numeric(page)) 
+  
+randoms_revision_history_page_details_ip_prop <- 
+  randoms_revision_history_page_details_ip %>% 
+  group_by(page) %>% 
+  summarise(prop_ip_addresses = sum(is_ip_address) / n() )
+
+ggplot(randoms_revision_history_page_details_ip_prop,
+       aes(prop_ip_addresses)) +
+  geom_histogram() +
+  theme_minimal()
+```
+
+Overall location of IP edits for all random pages
+
+```{r}
+randoms_revision_history_page_details_ip_location <- 
+randoms_revision_history_page_details_ip %>% 
+  filter(is_ip_address) %>% 
+  mutate(ip_location = map(rh_user, ~maxmind(.x, ip_db)))  %>% 
+  unnest(ip_location)
+
+randoms_revision_history_page_details_ip_location_tally <- 
+randoms_revision_history_page_details_ip_location %>% 
+  filter(!is.na(country_name)) %>% 
+  mutate(country_name = fct_rev(fct_infreq(country_name))) %>% 
+  group_by(country_name) %>% 
+  tally(sort = TRUE) %>% 
+  filter(n > 100) 
+
+ggplot(randoms_revision_history_page_details_ip_location_tally,
+       aes(country_name, n)) +
+  geom_col() +
+  coord_flip()   +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::comma)
+```
+
+What's the geographic diversity of edits per random page?
+
+```{r}
+randoms_revision_history_page_details_ip_location_props_per_page <- 
+randoms_revision_history_page_details_ip_location %>% 
+  filter(!is.na(country_name)) %>% 
+  mutate(country_name = fct_rev(fct_infreq(country_name))) %>% 
+  group_by(page, country_name) %>% 
+  tally() %>% 
+  mutate(prop = n / sum(n)) 
+  filter(country_name %in% randoms_revision_history_page_details_ip_location_tally$country_name)
+
+ggplot(randoms_revision_history_page_details_ip_location_props_per_page,
+       aes(country_name, 
+           prop)) +
+  geom_boxplot() +
+  coord_flip()
+
+randoms_revision_history_page_details_ip_location_props_per_page_div <- 
+  randoms_revision_history_page_details_ip_location_props_per_page %>% 
+  group_by(page) %>% 
+  summarise(shannon = vegan::diversity(n)) 
+
+ggplot(randoms_revision_history_page_details_ip_location_props_per_page_div,
+       aes( shannon)) +
+  geom_histogram() 
+```
+
+
+
+
+```{r}
+
+revision_history_page_details_ip_addresses <- 
+randoms_revision_history_page_details %>% 
+  mutate()
+  mutate(edits_from_ip_addresses = map(revision_history_page_details,
+                          ~.x %>% 
+                            filter(get_ip_addresses(rh_user) != "") %>% 
+                            mutate(ip_location = map(rh_user, 
+                                                     ~maxmind(.x, ip_db)))  %>% 
+                            unnest(ip_location))) 
+  
+
+```
+
+```{r}
+# analyse the countries of IP address vs country of WH site
 revision_history_page_details_ip_addresses <- 
 revision_history_page_details %>% 
   mutate(edits_from_ip_addresses = map(revision_history_page_details,
@@ -481,9 +586,7 @@ revision_history_page_details %>%
                             mutate(ip_location = map(rh_user, 
                                                      ~maxmind(.x, ip_db)))  %>% 
                             unnest(ip_location))) 
-
-
-# analyse the countries of IP address vs country of WH site
+                            
 revision_history_page_details_ip_addresses_df <- 
 revision_history_page_details_ip_addresses %>% 
   unnest(edits_from_ip_addresses) 
@@ -539,10 +642,6 @@ ggplot(revision_history_page_details_ip_addresses_countries,
   theme_minimal() +
   coord_equal()
 
-```
-
-
-
 
 ggplot(revision_history_page_details_ip_addresses_countries, 
        aes(sum_prop_internal, 
@@ -555,18 +654,167 @@ ggplot(revision_history_page_details_ip_addresses_countries,
 
 ```
 
-
-
-
 ## Networks
 
 editors
 
 ## Controversies
 
+Look at distributions of variables, then say 2sd is extreme, and match those to the WH pages to find out what they are
+
+What's the typical distribution of talk page length? 
+
+```{r}
+ten_k_random_wp_pages %>% 
+  mutate(tp_divided_by_page_word_count = talk_page_wordcount / page_wordcount) %>% 
+  ggplot(aes(talk_page_wordcount)) +
+  geom_histogram() +
+  scale_x_log10(labels = scales::comma_format(accuracy = 0.01))
+```
+
+Can we detect -ve sentiment on the talk pages? Perhaps as distributions, over every 100 words per page
+
+```{r}
+library(tidytext)
+
+```
+
+What's the typical distribution of the proportion of edits that are reverts?
+
+```{r}
+ggplot(ten_k_random_wp_pages,
+       aes(rh_revert_prop)) +
+  geom_histogram() +
+  scale_x_log10()
+
+```
+
+What are the keywords for controversy in edit messages? And how common are these warrning messages?
+
+```{r}
+randoms_revision_history_page_details_ip_warring_words <- 
+randoms_revision_history_page_details_ip %>% 
+  mutate(warring_words = (str_detect(rh_comment, 'undid|vandalism|why|inaccurate|wrong|warning|blocked|warring|disputed|neutral|unacceptable' )))
+
+# distribution of edits with warring words
+randoms_revision_history_page_details_ip_warring_words_prop <- 
+randoms_revision_history_page_details_ip_warring_words %>% 
+  group_by(page) %>% 
+  summarise(prop_warring_edits = sum(warring_words) / n()) 
+
+
+ggplot(randoms_revision_history_page_details_ip_warring_words_prop,
+         aes(prop_warring_edits)) +
+  geom_histogram() +
+  scale_x_log10()
+```
+
+Is there are correlation between the proportion of warring words and talk page length?
+
+```{r}
+# some interesting groupings
+randoms_revision_history_page_details_ip_warring_words_prop %>% 
+  left_join(ten_k_random_wp_pages %>% 
+  mutate(page = 1:nrow(.))) %>% 
+  filter(prop_warring_edits > 0) %>% 
+  ggplot(aes(prop_warring_edits, 
+             talk_page_wordcount ,
+             size = page_wordcount)) +
+  geom_point(alpha = 0.2)
+```
+
+Is there are correlation between the proportion of warring words and revert frequency?
+
+```{r}
+randoms_revision_history_page_details_ip_warring_words_prop_revert_prop <- 
+randoms_revision_history_page_details_ip_warring_words_prop %>% 
+  left_join(ten_k_random_wp_pages %>% 
+  mutate(page = 1:nrow(.))) %>% 
+  filter(prop_warring_edits != 0,
+         rh_revert_prop != 0) 
+
+lm(rh_revert_prop ~ prop_warring_edits, 
+   data = randoms_revision_history_page_details_ip_warring_words_prop_revert_prop) %>% summary
+
+ggplot(randoms_revision_history_page_details_ip_warring_words_prop_revert_prop,
+         aes(prop_warring_edits, 
+             rh_revert_prop)) +
+  geom_point()
+```
+
+
+can we identify a cluster of controversial pages? Not really
+
+
+```{r}
+
+randoms_revision_history_page_details_ip_warring_words_prop_clus <- 
+randoms_revision_history_page_details_ip_warring_words_prop %>% 
+  left_join(ten_k_random_wp_pages %>% 
+  mutate(page = 1:nrow(.))) %>% 
+  select(rh_revert_prop, 
+         prop_warring_edits,
+         rh_diff_size_cv) %>%
+   filter_all(all_vars(!is.na(.))) %>% 
+  princomp(., scale = TRUE)
+
+
+```
+
+
 time between edits
-edit reverts
-talk page: length and sentiment
+
+```{r}
+library(lubridate)
+randoms_revision_history_page_details_ip_time_diffs <- 
+randoms_revision_history_page_details_ip %>% 
+  group_nest(page) %>% 
+  mutate(time_diff = map(data, ~lag(.x$rh_date) - .x$rh_date)) %>% 
+  unnest(time_diff) %>% 
+  mutate(time_diff_days = as.numeric(time_diff / 60 / 60 / 24)) %>% 
+  mutate(time_diff_hours = as.numeric(time_diff / 60 / 60 )) %>% 
+  mutate(less_than_one_month = ifelse(time_diff_hours < 744, TRUE, FALSE)) %>% 
+  mutate(less_than_one_week = ifelse(time_diff_hours < 168, TRUE, FALSE)) %>% 
+  bind_cols(randoms_revision_history_page_details_ip)  
+
+rle_tbl <- 
+tibble(lths = rle(randoms_revision_history_page_details_ip_time_diffs$rh_user)$lengths,
+vals = rle(randoms_revision_history_page_details_ip_time_diffs$rh_user)$values) 
+
+rle_tbl2 <- tibble(
+  rh_user = rep(rle_tbl$vals, rle_tbl$lths),
+  lths2 = rep(rle_tbl$lths, rle_tbl$lths)
+)
+
+randoms_revision_history_page_details_ip_time_diffs %>% 
+  filter(!is.na(time_diff_hours)) %>% 
+  mutate(quick_three_edits = time_diff_hours + lag(time_diff_hours) + lag(time_diff_hours, 2) + lag(time_diff_hours, 3)) %>% View
+
+randoms_revision_history_page_details_ip_time_diffs_quick <- 
+randoms_revision_history_page_details_ip_time_diffs %>% 
+ nest(-page) %>%  
+ mutate(edits_3 = map(data, ~.x %>% 
+                              filter(less_than_one_week) %>% 
+                              filter(n() > 4 ))) %>% 
+  unnest(edits_3)
+
+randoms_revision_history_page_details_ip_time_diffs %>% 
+  bind_cols(rle_tbl2) %>% 
+  filter(lths2 == 1) %>% 
+  filter(time_diff_hours < 24) %>% View
+  
+
+
+ggplot(randoms_revision_history_page_details_ip_time_diffs,
+       aes(time_diff_days)) +
+  geom_histogram()
+
+```
+
+
+
+
+
 
 ## Technicity
 
