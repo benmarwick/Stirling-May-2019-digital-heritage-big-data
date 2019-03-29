@@ -559,23 +559,6 @@ ggplot(randoms_revision_history_page_details_ip_location_props_per_page_div,
 ```
 
 
-
-
-```{r}
-
-revision_history_page_details_ip_addresses <- 
-randoms_revision_history_page_details %>% 
-  mutate()
-  mutate(edits_from_ip_addresses = map(revision_history_page_details,
-                          ~.x %>% 
-                            filter(get_ip_addresses(rh_user) != "") %>% 
-                            mutate(ip_location = map(rh_user, 
-                                                     ~maxmind(.x, ip_db)))  %>% 
-                            unnest(ip_location))) 
-  
-
-```
-
 ```{r}
 # analyse the countries of IP address vs country of WH site
 revision_history_page_details_ip_addresses <- 
@@ -811,8 +794,22 @@ ggplot(randoms_revision_history_page_details_ip_time_diffs,
 
 ```
 
-
-
+time series of edits: breakouts relating to events? monthly seems like a good level of aggregation. What can we do for spike detection?
+ 
+```{r}
+randoms_revision_history_page_details_ip_location %>% 
+  group_by(page) %>% 
+  mutate(the_d = floor_date(rh_date, "day")) %>% 
+    mutate(the_m = floor_date(rh_date, "month")) %>% 
+  group_by(page, the_m) %>% 
+  tally() %>% 
+  filter(n() > 130) %>%   # explore this value
+  ggplot() +
+  geom_line(aes(the_m,
+             n)) +
+  facet_wrap( ~ page, scales = "free")
+```
+ 
 
 
 
