@@ -502,7 +502,7 @@ get_various_page_data_for_all_pages_safe <-
          otherwise = "some_problem")
 
 
-wh_wiki_table <- readr::read_csv("data/wh_wiki_table.csv")
+wh_wiki_table <- readr::read_csv("../data/wh_wiki_table.csv")
 
 # this takes several hours
 page_data_for_all_pages <- 
@@ -512,11 +512,11 @@ page_data_for_all_pages <-
 page_data_for_all_pages$result %>% 
   select_if(is.numeric)
 
-page_data_for_all_pages_result <- page_data_for_all_pages$result 
+page_data_for_all_pages_result <- page_data_for_all_pages$result
 
 # save it
-saveRDS(page_data_for_all_pages$result, 
-        'data/page_data_for_all_pages.rds')
+saveRDS(page_data_for_all_pages_result, 
+        '../data/page_data_for_all_pages.rds')
 
 
 

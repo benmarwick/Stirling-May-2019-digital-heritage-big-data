@@ -33,3 +33,8 @@ random_page_data_tbl %>%
   geom_histogram() +
   facet_wrap( ~ variable, scales = "free")
 
+
+
+saveRDS(random_page_data_tbl, "data/random_page_data_tbl.rds")
+
+saveRDS(random_page_data_lst, "data/random_page_data_lst.rds")
