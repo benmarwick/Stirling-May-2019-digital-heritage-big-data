@@ -623,6 +623,9 @@ highlight.sector(oceania, track.index = 1, col = "purple",
 
 highlight.sector(south_america, track.index = 1, col = "brown", 
     text = "South America", cex = 0.8, text.col = "white", niceFacing = TRUE)
+```
+
+```{r}
 
 #-- 
 circos.track(track.index = 2, panel.fun = function(x, y) {
