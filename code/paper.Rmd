@@ -93,9 +93,9 @@ ggplot(wh_unesco_countries_count,
        aes(n)) +
   geom_histogram() +
   annotate("text", x = 30, y = 30, 
-           label = str_glue('Median = {median_number_unesco_sites_per_country} WH sites/country\nMode = {mode_number_unesco_sites_per_country} WH sites/country'),
+           label = str_glue('Median =\n{median_number_unesco_sites_per_country} WH sites/country\nMode =\n{mode_number_unesco_sites_per_country} WH sites/country'),
            size = 3) +
-  theme_nogrid(12)
+  theme_nogrid(8)
 
 sf_map_data_unesco <- 
 world %>% 
@@ -109,9 +109,10 @@ wh_country_unesco_count_map <-
 ggplot(data = sf_map_data_unesco) +
     geom_sf(aes(fill = n), lwd = 0) +
     scale_fill_viridis_c(na.value="grey90") +
-  coord_sf() +
   coord_sf(ylim = c(-50, 90), datum = NA) +
-  theme_minimal()
+  theme_minimal() +
+  ggtitle("Cultural Sites on the UNESCO World Heritage list",
+          subtitle = "from https://whc.unesco.org/en/syndication")
 
 wh_country_unesco_count_map +
   annotation_custom(ggplotGrob(wh_unesco_country_counts_hist), 
@@ -119,6 +120,8 @@ wh_country_unesco_count_map +
                     xmax = -90, 
                     ymin= 10, 
                     ymax=-70) 
+
+ggsave("figures/wh_country_unesco_count_map.png")
 
 ```
 
@@ -223,9 +226,14 @@ wh_wk_country_count_map <-
 ggplot(data = sf_map_data) +
     geom_sf(aes(fill = n), lwd = 0) +
     scale_fill_viridis_c(na.value="grey90") +
-  coord_sf() +
   coord_sf(ylim = c(-50, 90), datum = NA) +
-  theme_minimal()
+  theme_minimal() +
+  ggtitle("Cultural Sites on the UNESCO World Heritage list with Wikipedia pages",
+          subtitle = str_glue("The top five are {wh_wk_country_counts %>% 
+                                                  arrange(-n) %>% 
+                                                  slice(1:5) %>% 
+                                                  pull(country) %>%
+                                                  str_flatten(collapse = ', ')}"))
 
 wh_wk_country_count_map +
   annotation_custom(ggplotGrob(wh_wk_country_counts_hist), 
@@ -233,6 +241,8 @@ wh_wk_country_count_map +
                     xmax = -90, 
                     ymin= 10, 
                     ymax=-70) 
+
+ggsave("figures/wh_country_wikpedia_pages_count_map.png")
 ```
 
 Map of the ratio of WH sites with WP pages, per country
@@ -282,9 +292,9 @@ wh_wk_country_prop_map <-
 ggplot(data = sf_map_data_prop) +
     geom_sf(aes(fill = prop_sites_with_pages), lwd = 0) +
     scale_fill_viridis_c(na.value="grey90") +
-  coord_sf() +
   coord_sf(ylim = c(-50, 90), datum = NA) +
-  theme_minimal()
+  theme_minimal() +
+  ggtitle("Ratio of number of Cultural Sites on the UNESCO World Heritage list\nto the number of those sites with Wikipedia pages")
 
 wh_wk_country_prop_map +
   annotation_custom((wh_wk_country_prop_scatter_marginal), 
@@ -292,6 +302,8 @@ wh_wk_country_prop_map +
                     xmax = -90, 
                     ymin= 10, 
                     ymax=-70) 
+
+ggsave("figures/wh_country_wikpedia_pages_ratio_map.png")
 ```
 
 
@@ -338,6 +350,16 @@ page_data_for_all_pages_basic_qualities %>%
   mutate(source = ifelse(str_detect(variable, "rnd" ), "10k Random pages", "World Heritage pages")) %>% 
   mutate(variable = str_remove(variable, "rnd_"))
 
+label_names <- list(
+  "page_wordcount"="Page word count",
+  "page_wikilinks_out_per_1k_words"="Number of wikilinks\nper 1k words",
+  "page_cited_items_on_per_1k_words"="Number of sources cited\nper 1k words"
+)
+
+labeller <- function(variable,value){
+  return(label_names[value])
+}
+
 # density plots
   ggplot(page_data_for_all_pages_basic_qualities_long,
          aes(value)) +
@@ -346,8 +368,12 @@ page_data_for_all_pages_basic_qualities %>%
   scale_x_log10() +
   scale_fill_viridis_d() +
   facet_wrap( ~ variable, 
-              scales = "free") +
-  theme_minimal()
+              scales = "free",
+              labeller = labeller) +
+  theme_minimal() +
+    ggtitle("Basic qualities about Wikipedia article content")
+  
+  ggsave("figures/wh_wikpedia_pages_basic_content.png")
 ```
 
 ```{r}
@@ -379,6 +405,7 @@ number of links in
 page_views_last_n_days_total
 
 ```{r}
+library(ggrepel)
 ten_k_random_wp_pages_attent <- 
 ten_k_random_wp_pages %>% 
   select(page_wikilinks_in, 
@@ -388,6 +415,36 @@ page_data_for_all_pages_attent <-
 page_data_for_all_pages %>% 
   select(page_wikilinks_in, 
          page_views_last_n_days_total) 
+
+
+
+page_data_for_all_pages_attent_long <- 
+page_data_for_all_pages_attent %>% 
+  gather(variable, value) %>% 
+  bind_rows(ten_k_random_wp_pages_attent %>% 
+              gather(variable, value) %>% 
+              mutate(variable =  str_glue('rnd_{variable}'))) %>% 
+  mutate(source = ifelse(str_detect(variable, "rnd" ), "10k Random pages", 
+                         "World Heritage pages")) %>% 
+  mutate(variable = str_remove(variable, "rnd_"))
+
+# density plots
+  ggplot(page_data_for_all_pages_attent_long,
+         aes(value)) +
+  geom_density(aes(fill = source),
+               alpha = 0.3) +
+  scale_x_log10() +
+  scale_fill_viridis_d() +
+  facet_wrap( ~ variable, 
+              scales = "free") +
+  theme_minimal() +
+    ggtitle("Basic qualities about attention given to Wikipedia articles")
+  
+ggsave("figures/wh_wikpedia_pages_attention_given.png")
+```
+  
+  
+```{r}
 
 page_data_for_all_pages %>% 
   select( Site,
@@ -409,26 +466,7 @@ page_data_for_all_pages %>%
   coord_fixed(0.5) +
   theme_minimal() 
 
-page_data_for_all_pages_attent_long <- 
-page_data_for_all_pages_attent %>% 
-  gather(variable, value) %>% 
-  bind_rows(ten_k_random_wp_pages_attent %>% 
-              gather(variable, value) %>% 
-              mutate(variable =  str_glue('rnd_{variable}'))) %>% 
-  mutate(source = ifelse(str_detect(variable, "rnd" ), "10k Random pages", 
-                         "World Heritage pages")) %>% 
-  mutate(variable = str_remove(variable, "rnd_"))
 
-# density plots
-  ggplot(page_data_for_all_pages_attent_long,
-         aes(value)) +
-  geom_density(aes(fill = source),
-               alpha = 0.3) +
-  scale_x_log10() +
-  scale_fill_viridis_d() +
-  facet_wrap( ~ variable, 
-              scales = "free") +
-  theme_minimal()
 ```
 
 ## Basic qualities of the editing process
