@@ -953,13 +953,15 @@ ggplot() +
 for WH sites
 
 ```{r}
+
+n <- 12 # months of edit data
 revision_history_page_details_ip_addresses_df_monthly_edits <- 
 revision_history_page_details_ip_addresses_df  %>% 
   mutate(the_d = floor_date(rh_date, "day")) %>% 
     mutate(the_m = floor_date(rh_date, "month")) %>% 
   group_by(Site, the_m) %>% 
   tally() %>% 
-  filter(n() > 24) # explore this value
+  filter(n() >  n ) # n months worth of data - explore this value
 
 # distribution of edits per month
 ggplot(revision_history_page_details_ip_addresses_df_monthly_edits,
@@ -967,10 +969,15 @@ ggplot(revision_history_page_details_ip_addresses_df_monthly_edits,
   geom_histogram() +
   scale_x_log10()
 
-# subset so we get only sites with > 10 edits/month
+# subset so we get only sites with > n1 edits/month, and at least 3 months worth of edits
+
+n1 <- 7  # edits per month
+n2 <- 20 # months worth of edits
 revision_history_page_details_ip_addresses_df_monthly_edits_10 <- 
 revision_history_page_details_ip_addresses_df_monthly_edits %>% 
-  filter(max(n) >= 10) 
+  filter(max(n) >= n1) %>% 
+  group_by(Site) %>% 
+  filter(n() >= n2) 
 
 ```
 
@@ -989,7 +996,7 @@ revision_history_page_details_ip_addresses_df_monthly_edits_anoms <-
                                       threshold = "p95"))) %>% 
   unnest(anomalies) %>% 
   group_by(Site) %>% 
-  filter(max(anoms) >= 50) # where the anomaly is 50 edits/month or more
+  filter(max(anoms) >= 10) # where the anomaly is n edits/month or more
 
 ggplot() +
   geom_line(
@@ -1012,6 +1019,9 @@ ggplot() +
 
 bots
 
+What do bots do?
+
+Do people undo bot actions often?
 
 
   - length of articles http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.451.4208&rep=rep1&type=pdf 
