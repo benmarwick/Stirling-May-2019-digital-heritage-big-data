@@ -399,7 +399,7 @@ labeller <- function(variable,value){
 
 ```
 
-## Basic qualitites of attention paid to articles
+## Basic qualities of consumption of articles
 
 number of links in
 page_views_last_n_days_total
@@ -415,8 +415,6 @@ page_data_for_all_pages_attent <-
 page_data_for_all_pages %>% 
   select(page_wikilinks_in, 
          page_views_last_n_days_total) 
-
-
 
 page_data_for_all_pages_attent_long <- 
 page_data_for_all_pages_attent %>% 
@@ -449,9 +447,9 @@ labeller <- function(variable,value){
               scales = "free",
               labeller = labeller) +
   theme_minimal() +
-    ggtitle("Basic qualities about attention given to Wikipedia articles")
+    ggtitle("Basic qualities about consumption of Wikipedia articles")
   
-ggsave("figures/wh_wikpedia_pages_attention_given.png")
+ggsave("figures/wh_wikpedia_pages_consumption.png")
 ```
 
 
