@@ -429,6 +429,16 @@ page_data_for_all_pages_attent %>%
   mutate(variable = str_remove(variable, "rnd_"))
 
 # density plots
+
+label_names <- list(
+  "page_wikilinks_in"="Number of wikilinks to the page",
+  "page_views_last_n_days_total"="Total page views\n(last 100 days)"
+)
+
+labeller <- function(variable,value){
+  return(label_names[value])
+}
+
   ggplot(page_data_for_all_pages_attent_long,
          aes(value)) +
   geom_density(aes(fill = source),
@@ -436,46 +446,57 @@ page_data_for_all_pages_attent %>%
   scale_x_log10() +
   scale_fill_viridis_d() +
   facet_wrap( ~ variable, 
-              scales = "free") +
+              scales = "free",
+              labeller = labeller) +
   theme_minimal() +
     ggtitle("Basic qualities about attention given to Wikipedia articles")
   
 ggsave("figures/wh_wikpedia_pages_attention_given.png")
 ```
-  
+
+
+Scatterplot showing the WP sites that get the most attention 
   
 ```{r}
-
+library(ggrepel)
 page_data_for_all_pages %>% 
   select( Site,
+          page_wordcount,
          page_wikilinks_in, 
          page_views_last_n_days_total)  %>% 
   ggplot(aes(page_wikilinks_in,
              page_views_last_n_days_total,
-             label = Site)) +
-  geom_point(alpha = 0.4) +
+             label = str_wrap(Site, 30))) +
+  geom_point(alpha = 0.2,
+             aes(size = page_wordcount)) +
     geom_text_repel(
     data          = page_data_for_all_pages %>%  
                       filter(page_views_last_n_days_total > 190000),
     segment.size  = 0.2,
+    force = 50,
     segment.color = "grey50",
     direction     = "both"
   ) +
   scale_y_log10(expand = c(1, 0.05)) +
   scale_x_log10(limits = c(1, 10000)) +
   coord_fixed(0.5) +
-  theme_minimal() 
-
-
+  theme_minimal(base_size = 14) +
+  labs(x = "Number of wikilinks to the page",
+       y = "Total page views (last 100 days)") +
+    ggtitle("Basic qualities about attention given to Wikipedia articles")
+  
+ggsave("figures/wh_wikpedia_pages_attention_scatterplot.png")
 ```
 
 ## Basic qualities of the editing process
 
 number of edits, total, prop/words
+how many bot edits, how many reverts per page
 size of edits
-divesity of editors
+diversity of editors
 
 ```{r}
+# wh sites on wp
 revision_history_page_details <- 
   tibble(revision_history_page_details = map(page_data_for_all_pages$page_info_t, 
       ~.x$revision_history_page_details)) %>% 
@@ -487,10 +508,44 @@ revision_history_page_details <-
          rh_user_bot_prop = page_data_for_all_pages$rh_user_bot_prop,
          rh_revert_prop = page_data_for_all_pages$rh_revert_prop)
 
-ggplot(revision_history_page_details,
-       aes(rh_n_edits)) +
-  geom_histogram()
+# random sites
 
+ten_k_random_wp_pages_revision_history_page_details <- 
+  map_df(ten_k_random_wp_pages_lst, 
+         ~.x$revision_history_page_details, 
+         .id = 'Site')
+
+# very slow!
+ten_k_random_wp_pages_revision_history_page_details_summary_tbl <- 
+  ten_k_random_wp_pages_revision_history_page_details %>% 
+  mutate(Site = as.numeric(Site)) %>% 
+  group_by(Site) %>% 
+  summarise(
+         rh_n_editors = n_distinct(rh_user),
+         rh_n_edits =   n(),
+         rh_n_bot_edits = sum(bot),
+         rh_n_reverts = sum(revert)) %>% 
+  mutate(rh_revert_prop = rh_n_reverts / rh_n_edits,
+         rh_bot_edits_prop = rh_n_bot_edits / rh_n_edits)
+         
+# plot both samples, number of edits per page
+bind_rows(revision_history_page_details %>% 
+            select(Site, rh_n_edits) %>% 
+            mutate(Site = "wh"),
+          ten_k_random_wp_pages_revision_history_page_details_summary_tbl %>% 
+            select(Site, rh_n_edits) %>% 
+            mutate(Site = "rand")) %>% 
+  ggplot(aes(rh_n_edits,
+             fill = Site)) +
+  geom_density(alpha = 0.3) +
+  scale_x_log10() +
+  scale_fill_viridis_d(labels = c("Random", 
+                               "World Heritage")) +
+  labs(x = "Number of edits per page",
+       fill = "Wikipedia pages") +
+  theme_minimal() 
+  
+ggsave("figures/wh_wikpedia_edits_per_page.png")
 ```
 
 
