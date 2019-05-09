@@ -1145,12 +1145,32 @@ Look at distributions of variables, then say 2sd is extreme, and match those to 
 What's the typical distribution of talk page length? 
 
 ```{r}
+bind_rows(
+  
 ten_k_random_wp_pages %>% 
-  mutate(tp_divided_by_page_word_count = talk_page_wordcount / page_wordcount) %>% 
-  ggplot(aes(talk_page_wordcount)) +
-  geom_histogram() +
-  scale_x_log10(labels = scales::comma_format(accuracy = 0.01))
+  select(talk_page_wordcount) %>% 
+  mutate(Site = "Random pages"),
+
+page_data_for_all_pages %>% 
+  select(talk_page_wordcount) %>% 
+  mutate(Site = "World Heritage pages")
+) %>% 
+
+  ggplot(aes(talk_page_wordcount, 
+             fill = Site)) +
+  geom_density(alpha = 0.3) +
+   scale_fill_viridis_d(labels = c("Random", 
+                               "World Heritage")) +
+  labs(x = "Talk page word count",
+       fill = "Wikipedia pages") +
+  theme_minimal() +
+  scale_x_log10(labels = scales::comma_format(accuracy = 1))
+
+ggsave("figures/wh_wikpedia_pages_talk_page_worcount.png")
 ```
+
+which WH pages have the longest talk pages?
+
 
 Can we detect -ve sentiment on the talk pages? Perhaps as distributions, over every 100 words per page
 
