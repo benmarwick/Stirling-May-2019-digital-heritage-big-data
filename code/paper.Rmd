@@ -466,7 +466,8 @@ page_data_for_all_pages %>%
              page_views_last_n_days_total,
              label = str_wrap(Site, 30))) +
   geom_point(alpha = 0.2,
-             aes(size = page_wordcount)) +
+             aes(size = page_wordcount,
+                 colour = page_wordcount)) +
     geom_text_repel(
     data          = page_data_for_all_pages %>%  
                       filter(page_views_last_n_days_total > 190000),
@@ -478,19 +479,25 @@ page_data_for_all_pages %>%
   scale_y_log10(expand = c(1, 0.05)) +
   scale_x_log10(limits = c(1, 10000)) +
   coord_fixed(0.5) +
+  scale_color_viridis_c(name = "Wordcount", 
+                        labels = c(20000, 15000, 10000, 5000),
+                        breaks = c(20000, 15000, 10000, 5000)) +
+  scale_size_continuous(name = "Wordcount", 
+                        labels = c(20000, 15000, 10000, 5000),
+                        breaks = c(20000, 15000, 10000, 5000)) +
+   guides(color= guide_legend(), size=guide_legend()) +
   theme_minimal(base_size = 14) +
   labs(x = "Number of wikilinks to the page",
        y = "Total page views (last 100 days)") +
-    ggtitle("Basic qualities about attention given to Wikipedia articles")
+    ggtitle("Basic qualities about the consumption of Wikipedia articles")
   
-ggsave("figures/wh_wikpedia_pages_attention_scatterplot.png")
+ggsave("figures/wh_wikpedia_pages_consumption_scatterplot.png")
 ```
 
 ## Basic qualities of the editing process
 
-number of edits, total, prop/words
+number of edits, total, edit density (prop/words), size of edits
 how many bot edits, how many reverts per page
-size of edits
 diversity of editors
 
 ```{r}
@@ -546,6 +553,280 @@ bind_rows(revision_history_page_details %>%
 ggsave("figures/wh_wikpedia_edits_per_page.png")
 ```
 
+Edits per 1k words, as a measure of edit density
+
+```{r}
+revision_history_page_details_wordcount <- 
+  revision_history_page_details %>% 
+  bind_cols(page_data_for_all_pages %>% select(page_wordcount)) %>% 
+  mutate(edits_per_1k_words = rh_n_edits / (page_wordcount / 1000))
+
+ten_k_random_wp_pages_revision_history_page_details_summary_tbl_all_dets <- 
+bind_cols(ten_k_random_wp_pages, 
+          ten_k_random_wp_pages_revision_history_page_details_summary_tbl) %>% 
+  mutate(edits_per_1k_words = rh_n_edits / (page_wordcount / 1000))
+
+bind_rows(revision_history_page_details_wordcount %>% 
+            select(Site, edits_per_1k_words) %>% 
+            mutate(Site = "wh"),
+          ten_k_random_wp_pages_revision_history_page_details_summary_tbl_all_dets %>% 
+            select(Site, edits_per_1k_words) %>% 
+            mutate(Site = "rand")) %>% 
+  ggplot(aes(edits_per_1k_words,
+             fill = Site)) +
+  geom_density(alpha = 0.3) +
+  #xlim(0, 100) +
+  scale_x_log10() +
+  scale_fill_viridis_d(labels = c("Random", 
+                               "World Heritage")) +
+  labs(x = "Number of edits per 1k words per page",
+       fill = "Wikipedia pages") +
+  theme_minimal() 
+  
+ggsave("figures/wh_wikpedia_edits_density_page.png")
+```
+
+Size of edits, absolute and raw
+
+```{r}
+page_data_for_all_pages_rh_tbl <- 
+map_df(page_data_for_all_pages$page_info_t, 
+      ~.x$revision_history_page_details, .id = "Site")
+
+label_names <- list(
+  "mean_abs_diff"="Absolute edit sizes",
+  "mean_diff"="Raw edit sizes"
+)
+
+labeller <- function(variable,value){
+  return(label_names[value])
+}
+
+bind_rows(page_data_for_all_pages_rh_tbl %>% 
+            select(Site, rh_diff_size) %>% 
+            group_by(Site) %>% 
+            summarise(mean_diff = mean((rh_diff_size)),
+                      mean_abs_diff = mean(abs(rh_diff_size))) %>% 
+            mutate(Site = "wh"),
+          ten_k_random_wp_pages_revision_history_page_details %>% 
+            select(Site, rh_diff_size) %>% 
+              group_by(Site) %>% 
+            summarise(mean_diff = mean((rh_diff_size)),
+                      mean_abs_diff = mean(abs(rh_diff_size))) %>% 
+            mutate(Site = "rand")) %>% 
+  gather(variable, value, -Site) %>% 
+  ggplot(aes(value,
+             fill = Site)) +
+  geom_density(alpha = 0.3) +
+  #xlim(0, 100) +
+  scale_x_log10() +
+  scale_fill_viridis_d(labels = c("Random", 
+                               "World Heritage")) +
+  labs(x = "Average size of edits per article (bytes)",
+       fill = "Wikipedia pages") +
+  facet_wrap( ~ variable, labeller = labeller) +
+  theme_minimal() 
+
+ggsave("figures/wh_wikpedia_edit_sizes.png")
+```
+
+How many edits made by bots? Proportion of edits per page made by bots
+
+```{r}
+bind_rows(
+  
+page_data_for_all_pages_rh_tbl %>% 
+  group_by(Site) %>% 
+  summarise( n_bot_edits = sum(bot),
+             n_edits = n()) %>% 
+  mutate(prop_bot_edits = n_bot_edits / n_edits,
+           Site = "wh"),
+
+ten_k_random_wp_pages_revision_history_page_details %>%  
+  group_by(Site) %>% 
+summarise( n_bot_edits = sum(bot),
+           n_edits = n()) %>% 
+  mutate(prop_bot_edits = n_bot_edits / n_edits,
+         Site = "rand")
+) %>% 
+  
+  ggplot(aes(prop_bot_edits,
+             fill = Site)) +
+  geom_density(alpha = 0.3) +
+  #xlim(0, 100) +
+  scale_x_log10() +
+  scale_fill_viridis_d(labels = c("Random", 
+                               "World Heritage")) +
+  labs(x = "Proportion of edits made by bots per article",
+       fill = "Wikipedia pages") +
+  theme_minimal() 
+
+ggsave("figures/wh_wikpedia_edit_sizes.png")
+```
+
+Which WH pages are most edited by bots?
+
+```{r}
+library(ggrepel)
+
+wh_bots <- 
+ tibble(revision_history_page_details = map(page_data_for_all_pages$page_info_t, 
+      ~.x$revision_history_page_details))  %>% 
+  mutate(Site = page_data_for_all_pages$Site) %>% 
+  mutate(n_bot_edits = map_dbl(revision_history_page_details, ~sum(.x$bot)),
+         n_edits = map_int(revision_history_page_details, ~nrow(.))) %>% 
+  mutate(prop_bot_edits = n_bot_edits / n_edits) %>% 
+  arrange(desc(prop_bot_edits)) 
+  
+  ggplot(wh_bots, 
+         aes(n_bot_edits,
+             n_edits,
+             label = str_wrap(Site, 30))) +
+  geom_point(alpha = 0.2,
+             aes(size =   prop_bot_edits,
+                 colour = prop_bot_edits)) +
+    geom_text_repel(
+    data            = wh_bots %>%  
+                      filter(prop_bot_edits > 0.36),
+    segment.size  = 0.2,
+    force = 50,
+    segment.color = "grey50",
+    direction     = "both"
+  ) +
+  scale_y_log10() +
+  scale_x_log10() +
+  coord_fixed(0.5) +
+  scale_color_viridis_c(name = "Proportion of\nedits by bots", 
+                        labels = c(0, 0.1, 0.2, 0.3, 0.4),
+                        breaks = c(0, 0.1, 0.2, 0.3, 0.4)) +
+  scale_size_continuous(name = "Proportion of\nedits by bots", 
+                        labels = c(0, 0.1, 0.2, 0.3, 0.4),
+                        breaks = c(0, 0.1, 0.2, 0.3, 0.4)) +
+   guides(color= guide_legend(), size=guide_legend()) +
+  theme_minimal(base_size = 14) +
+  labs(x = "Number of edits by bots",
+       y = "Total number of edits") +
+    ggtitle("Bot activity on Wikipedia articles")
+  
+ggsave("figures/wh_wikpedia_pages_bot_edits_scatterplot.png")
+```
+
+which bots are most active on WH pages vs random pages?
+Cydebot: category edits
+Smackbot: dates in templates
+ClueBot NG: vandalism
+
+```{r}
+bind_rows(
+page_data_for_all_pages_rh_tbl %>% 
+  filter(bot == 1) %>% 
+  group_by(rh_user) %>% 
+  tally(sort = TRUE) %>% 
+  slice(1:10) %>% 
+  mutate( Site = "World Heritage Sites"),
+
+ten_k_random_wp_pages_revision_history_page_details %>% 
+  filter(bot == 1) %>% 
+  group_by(rh_user) %>% 
+  tally(sort = TRUE) %>% 
+    slice(1:10) %>% 
+   mutate( Site = "Random pages")) %>% 
+  
+  ggplot(aes(reorder(rh_user, n),
+             n)) +
+  geom_col() +
+  theme_minimal() +
+  coord_flip() +
+  facet_wrap( ~ Site, scales = "free") +
+  xlab("")
+  
+ggsave("figures/wh_wikpedia_what_bots.png")
+```
+
+So about vandalism? do WH sites get more than random ones?
+
+```{r}
+bind_rows(
+page_data_for_all_pages_rh_tbl %>% 
+  mutate(vandalism = ifelse(str_detect(rh_comment, "vandal"), 1, 0)) %>%
+  group_by(Site) %>% 
+  summarise( n_vandal_edits = sum(vandalism),
+             n_edits = n()) %>% 
+  mutate(prop_vandal_edits = n_vandal_edits / n_edits,
+           Site = "World Heritage Sites"),
+
+ten_k_random_wp_pages_revision_history_page_details %>% 
+  mutate(vandalism = ifelse(str_detect(rh_comment, "vandal"), 1, 0)) %>%
+  group_by(Site) %>% 
+  summarise( n_vandal_edits = sum(vandalism),
+             n_edits = n()) %>% 
+  mutate(prop_vandal_edits = n_vandal_edits / n_edits, 
+         Site = "Random pages")
+) %>% 
+  
+   ggplot(aes(prop_vandal_edits,
+             fill = Site)) +
+  geom_density(alpha = 0.3) +
+  scale_x_log10() +
+  scale_fill_viridis_d(labels = c("Random", 
+                               "World Heritage")) +
+  labs(x = "Proportion of edits relating to vandalism per article",
+       fill = "Wikipedia pages") +
+  theme_minimal() 
+
+ggsave("figures/wh_wikpedia_vandalism_edits.png")
+
+```
+
+Which WH pages have the most vandalism?
+
+```{r}
+
+vandal_edits <- 
+ tibble(revision_history_page_details = map(page_data_for_all_pages$page_info_t, 
+      ~.x$revision_history_page_details))  %>% 
+  mutate(Site = page_data_for_all_pages$Site) %>% 
+  mutate(n_vandal_edits = map_dbl(revision_history_page_details, 
+                                  ~sum(ifelse(str_detect(.x$rh_comment, "vandalism"), 1, 0))),
+         n_edits = map_int(revision_history_page_details, ~nrow(.))) %>% 
+  mutate(prop_vandal_edits = n_vandal_edits / n_edits) %>% 
+  arrange(desc(prop_vandal_edits)) 
+  
+ggplot(vandal_edits, 
+         aes(n_vandal_edits,
+             n_edits,
+             label = str_wrap(Site, 30))) +
+  geom_point(alpha = 0.2,
+             aes(size =   prop_vandal_edits,
+                 colour = prop_vandal_edits)) +
+    geom_text_repel(
+    data            = vandal_edits %>%  
+                      filter(prop_vandal_edits > 0.055),
+    segment.size  = 0.2,
+    force = 50,
+    segment.color = "grey50",
+    direction     = "both"
+  ) +
+  scale_y_log10() +
+  scale_x_log10() +
+  coord_fixed(0.5) +
+  scale_color_viridis_c(name = "Proportion of\nedits about vandalism", 
+                        labels = c(0, 0.025, 0.05, 0.075),
+                        breaks = c(0, 0.025, 0.05, 0.075)) +
+  scale_size_continuous(name = "Proportion of\nedits about vandalism", 
+                        labels = c(0, 0.025, 0.05, 0.075),
+                        breaks = c(0, 0.025, 0.05, 0.075)) +
+   guides(color= guide_legend(), size=guide_legend()) +
+  theme_minimal(base_size = 14) +
+  labs(x = "Number of edits about vandalism",
+       y = "Total number of edits") +
+    ggtitle("Editing about vandalism on Wikipedia articles")
+  
+ggsave("figures/wh_wikpedia_pages_vandal_edits_scatterplot.png")
+
+```
+
+Reverts
 
 ## Locality  
 
