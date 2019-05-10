@@ -828,6 +828,84 @@ ggsave("figures/wh_wikpedia_pages_vandal_edits_scatterplot.png")
 
 Reverts
 
+```{r}
+
+```
+
+
+What's the typical distribution of talk page length? 
+
+```{r}
+bind_rows(
+  
+ten_k_random_wp_pages %>% 
+  select(talk_page_wordcount) %>% 
+  mutate(Site = "Random pages"),
+
+page_data_for_all_pages %>% 
+  select(talk_page_wordcount) %>% 
+  mutate(Site = "World Heritage pages")
+) %>% 
+
+  ggplot(aes(talk_page_wordcount, 
+             fill = Site)) +
+  geom_density(alpha = 0.3) +
+   scale_fill_viridis_d(labels = c("Random", 
+                               "World Heritage")) +
+  labs(x = "Talk page word count",
+       fill = "Wikipedia pages") +
+  theme_minimal() +
+  scale_x_log10(labels = scales::comma_format(accuracy = 1))
+
+ggsave("figures/wh_wikpedia_pages_talk_page_worcount.png")
+```
+
+which WH pages have the longest talk pages?
+
+```{r}
+
+wh_pages_talk_page_length <- 
+left_join(page_data_for_all_pages,
+          revision_history_page_details_wordcount) 
+
+
+ggplot(wh_pages_talk_page_length,
+         aes(rh_n_edits,
+             rh_revert_prop,
+             label = str_wrap(Site, 30))) +
+  geom_point(alpha = 0.5,
+             aes(size =   (talk_page_wordcount),
+                 colour = (talk_page_wordcount))) +
+    geom_text_repel(
+    data            = wh_pages_talk_page_length %>%  
+                      filter(talk_page_wordcount > 8000),
+    segment.size  = 0.2,
+    colour = "black",
+    force = 50,
+    segment.color = "grey50",
+    direction     = "both"
+  ) +
+  scale_y_log10() +
+  scale_x_log10() +
+  coord_fixed(1) +
+  scale_color_viridis_c(name = "Talk page word count", 
+                        labels = c(5000, 10000, 15000, 20000),
+                        breaks = c(5000, 10000, 15000, 20000)) +
+  scale_size_continuous(name = "Talk page word count", 
+                        labels = c(5000, 10000, 15000, 20000),
+                        breaks = c(5000, 10000, 15000, 20000)) +
+   guides(color= guide_legend(), size=guide_legend()) +
+  theme_minimal(base_size = 14) +
+  labs(x = "Number of edits",
+       y = "Proportion of edits that are reverts") +
+    ggtitle("")
+
+ggsave("figures/wh_wikpedia_pages_talk_page_wordcount_reverts_scatterplot.png")
+
+```
+
+
+
 ## Locality  
 
 IP addresses
@@ -1142,34 +1220,11 @@ editors
 
 Look at distributions of variables, then say 2sd is extreme, and match those to the WH pages to find out what they are
 
-What's the typical distribution of talk page length? 
+
 
 ```{r}
-bind_rows(
-  
-ten_k_random_wp_pages %>% 
-  select(talk_page_wordcount) %>% 
-  mutate(Site = "Random pages"),
-
-page_data_for_all_pages %>% 
-  select(talk_page_wordcount) %>% 
-  mutate(Site = "World Heritage pages")
-) %>% 
-
-  ggplot(aes(talk_page_wordcount, 
-             fill = Site)) +
-  geom_density(alpha = 0.3) +
-   scale_fill_viridis_d(labels = c("Random", 
-                               "World Heritage")) +
-  labs(x = "Talk page word count",
-       fill = "Wikipedia pages") +
-  theme_minimal() +
-  scale_x_log10(labels = scales::comma_format(accuracy = 1))
-
-ggsave("figures/wh_wikpedia_pages_talk_page_worcount.png")
 ```
 
-which WH pages have the longest talk pages?
 
 
 Can we detect -ve sentiment on the talk pages? Perhaps as distributions, over every 100 words per page
