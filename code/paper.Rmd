@@ -996,6 +996,13 @@ ten_k_random_wp_pages_revision_history_page_details %>%
 
 ```
 
+Which articles have the most reverts?
+
+```{r}
+
+```
+
+
 What's the typical distribution of talk page length? 
 
 ```{r}
@@ -1070,9 +1077,54 @@ ggsave("figures/wh_wikpedia_pages_talk_page_wordcount_reverts_scatterplot.png")
 Talk page topic modelling 
 
 ```{r}
-wh_wiki_talk_pages
+library(tidytext)
 
+tidy_talk <- 
+enframe(unlist(wh_wiki_talk_pages)) %>% 
+  mutate(clean_text = str_remove_all(value, "\n|\t")) %>% 
+  unnest_tokens(word, clean_text) %>% 
+  anti_join(stop_words) %>% 
+  filter(!word %in% c("article", "page", "talk", "utc", "class", "edit", "project's"))
+
+# top words
+tidy_talk %>% 
+  count(word, sort = TRUE)
+
+# biggest documents
+tidy_talk %>% 
+  group_by(name) %>% 
+  tally(sort = TRUE)
 ```
+
+The statistic tf-idf identifies words that are important to a document in a collection of documents; in this case, we’ll see which words are important in one of the talk pages compared to the others.
+
+```{r eval = FALSE}
+
+library(drlib) # devtools::install_github("dgrtwo/drlib")
+
+tidy_talk_tf_idf <- tidy_talk %>%
+  count(name, word, sort = TRUE) %>%
+  bind_tf_idf(word, name, n) %>%
+  arrange(-tf_idf) %>%
+  group_by(name) %>%
+  top_n(10) %>%
+  ungroup
+
+tidy_talk_tf_idf %>%
+  mutate(word = reorder_within(word, tf_idf, name)) %>%
+  ggplot(aes(word, tf_idf, fill = name)) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ name, scales = "free", ncol = 3) +
+  scale_x_reordered() +
+  coord_flip() +
+  theme(strip.text=element_text(size=11)) +
+  labs(x = NULL, y = "tf-idf",
+       title = "Highest tf-idf words in talk pages ",
+       subtitle = "")
+```
+
+
+
 
 
 ## Spatial patterns  
