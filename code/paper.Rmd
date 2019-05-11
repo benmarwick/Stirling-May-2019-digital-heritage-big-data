@@ -23,6 +23,10 @@ wh_wiki_table <-
   read_csv(here::here("data", 
                       "wh_wiki_table.csv"))
 
+# the talk pages for all WH sites, with WP pages (n = 846)
+wh_wiki_talk_pages <-  readRDS(here::here("data", 
+                     "wh_wiki_table_talk_page_content.rds"))
+
 # all WH sites according to UNESCO
 # from https://whc.unesco.org/en/syndication
 wh_unesco <- readxl::read_excel(here::here("data",
@@ -1066,6 +1070,7 @@ ggsave("figures/wh_wikpedia_pages_talk_page_wordcount_reverts_scatterplot.png")
 Talk page topic modelling 
 
 ```{r}
+wh_wiki_talk_pages
 
 ```
 

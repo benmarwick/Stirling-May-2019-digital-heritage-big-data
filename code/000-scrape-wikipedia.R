@@ -513,6 +513,10 @@ wh_wiki_table_talk_page_content <-
   map(wh_wiki_table$site_page_link, 
       ~get_talk_page_content(.x))
 
+# save it
+saveRDS(wh_wiki_table_talk_page_content, 
+        '../data/wh_wiki_table_talk_page_content.rds')
+
 
 
 
