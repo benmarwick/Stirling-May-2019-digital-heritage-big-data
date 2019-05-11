@@ -47,6 +47,139 @@ theme_nogrid <- function (base_size = 12, base_family = "") {
 }
 ```
 
+## Some sort of clustering
+
+```{r}
+normalize = function(x) (x-min(x))/(max(x)-min(x))
+
+#--------------------------------------------------------------------------
+# take a look at the distribution of page variables
+some_page_variables <- 
+  page_data_for_all_pages %>% 
+  select(page_wordcount, 
+         page_wikilinks_out,
+         page_wikilinks_in,
+         page_cited_items_on) %>% 
+  mutate(page_wikilinks_out_per_word = page_wikilinks_out / page_wordcount,
+         page_cited_items_on_per_word = page_cited_items_on / page_wordcount) 
+  
+
+
+# umap
+library(uwot)
+library("tmap")
+data("World")
+
+pages_umap_input <- 
+  some_page_variables  %>% 
+  mutate(page_wordcount_norm = normalize(page_wordcount),
+         page_wikilinks_in_norm= normalize(page_wikilinks_in),
+         page_wikilinks_out_per_word_norm = normalize(page_wikilinks_out_per_word),
+         page_cited_items_on_per_word_norm = normalize(page_cited_items_on_per_word)) %>% 
+  select(-page_wordcount,
+         -page_cited_items_on, 
+         -page_wikilinks_out,
+         -page_wikilinks_in,
+         -page_wikilinks_out_per_word,
+         -page_cited_items_on_per_word) %>% 
+  bind_cols(., page_data_for_all_pages[ , 'country'] ) %>% 
+  filter_all(all_vars(!is.na(.))) %>% 
+  left_join(World %>% 
+              select(name, continent), 
+            by = c('country' = 'name'))
+
+# compute umap
+
+pages_umap_input_selected <- 
+  pages_umap_input %>% 
+  select(-country, 
+         -continent,
+         -geometry
+         )  
+    
+pages_umap_output <- 
+  pages_umap_input_selected %>% 
+  umap(., 
+       n_neighbors = 60, 
+       min_dist = 0.7,
+       nn_method = "annoy",
+       init = "spca") %>% 
+  as_tibble()
+
+# compute hdbscan clusters
+library(dbscan)
+hdbscan_out <- hdbscan(pages_umap_output, 
+                       minPts = 5)
+
+table(hdbscan_out$cluster)
+
+main_plot <- 
+ggplot(pages_umap_output,
+       aes(V1, V2)) +
+  geom_point(
+    aes(colour = factor(hdbscan_out$cluster),
+        size =  pages_umap_input_selected$page_wordcount_norm  ,
+        shape = pages_umap_input$continent
+        )) +
+  scale_size(range = c(2,7), guide = FALSE) +
+  scale_shape(name = "Continent") +
+  scale_color_viridis_d(guide = FALSE) +
+  theme_minimal() +
+  theme(legend.position = c(0.1, 0.8)) +
+  xlab("") +
+  ylab("") 
+
+# train a feature-selecting classificator like random forests on 
+# the cluster labels
+
+rand_forest_input <- 
+  pages_umap_input_selected %>% 
+  mutate(clus = hdbscan_out$cluster) %>% 
+  filter(clus != 0)
+
+library(caret)
+
+fit <- train(
+  clus ~ .,
+  data = rand_forest_input,
+  method = "ranger",
+  trControl = trainControl(method="cv", 
+                            number = 10, 
+                            allowParallel = TRUE, 
+                            verbose = TRUE),
+  importance = 'permutation')
+
+fit
+var_imp_tbl <- tibble(var = row.names(varImp(fit)$importance),
+                      imp = varImp(fit)$importance$Overall)
+
+theme_nogrid <- function (base_size = 12, base_family = "") {
+  theme_bw(base_size = base_size, 
+           base_family = base_family) %+replace% 
+    theme(panel.grid = element_blank() )   
+}
+
+sub_plot <- 
+ggplot(var_imp_tbl,
+       aes(reorder( var, -imp ),
+           imp)) +
+  geom_col() +
+  coord_flip() +
+  xlab("") +
+  ylab("") +
+  theme_nogrid(base_size = 6)
+
+# plot plus subplot
+main_plot + 
+  annotation_custom(ggplotGrob(sub_plot), 
+                    xmin = 3, 
+                    xmax = 6, 
+                    ymin= 6.5, 
+                    ymax= 3.5) 
+
+ggsave("figures/wh_country_umap_hdbscan.png")
+```
+
 ## Representation by country
 
 Where are the WH sites, before looking into WP
@@ -451,7 +584,6 @@ labeller <- function(variable,value){
   
 ggsave("figures/wh_wikpedia_pages_consumption.png")
 ```
-
 
 Scatterplot showing the WP sites that get the most attention 
   
@@ -860,7 +992,6 @@ ten_k_random_wp_pages_revision_history_page_details %>%
 
 ```
 
-
 What's the typical distribution of talk page length? 
 
 ```{r}
@@ -939,7 +1070,7 @@ Talk page topic modelling
 ```
 
 
-## Locality  
+## Spatial patterns  
 
 IP addresses
 
@@ -982,10 +1113,29 @@ randoms_revision_history_page_details_ip_prop <-
   group_by(page) %>% 
   summarise(prop_ip_addresses = sum(is_ip_address) / n() )
 
-ggplot(randoms_revision_history_page_details_ip_prop,
-       aes(prop_ip_addresses)) +
-  geom_histogram() +
-  theme_minimal()
+both_ip_props <- 
+bind_rows(
+revision_history_page_details_ip_addresses_countries %>% 
+  ungroup %>% 
+  select(prop_anon_of_all_edits) %>% 
+  mutate(source = "World Heritage Sites", 
+         prop_ip_addresses = prop_anon_of_all_edits),
+
+randoms_revision_history_page_details_ip_prop %>% 
+    ungroup %>% 
+  select(prop_ip_addresses) %>% 
+    mutate(source = "Random pages")) 
+
+ggplot(both_ip_props,
+       aes(fill = source, 
+           prop_ip_addresses)) +
+  geom_density(alpha = 0.3) +
+   scale_fill_viridis_d(labels = c("Random", 
+                               "World Heritage")) +
+  theme_minimal() +
+  xlab("Proportion of all edits that are anonymous")
+
+ggsave("figures/proportion_of_IP_edits.png")
 ```
 
 Overall location of IP edits for all random pages
@@ -1088,7 +1238,8 @@ revision_history_page_details_ip_addresses_df %>%
 ggplot(revision_history_page_details_ip_addresses_countries,
        aes(prop_anon_of_all_edits)) +
   geom_histogram() +
-  theme_minimal()
+  theme_minimal(base_size = 12) +
+  xlab("Proportion of all edits that are anonymous")
 ```
 
 ```{r}
@@ -1175,6 +1326,12 @@ circos.track(track.index = 1, panel.fun = function(x, y) {
 }, bg.border = NA) # here set bg.border to NA is important
 
 
+```
+
+```{r}
+
+# stuff that doesn't work
+
 highlight.sector(africa, track.index = 1, col = "#00FF0040", 
     text = "Africa", cex = 0.8, text.col = "white", niceFacing = TRUE)
 
@@ -1192,9 +1349,6 @@ highlight.sector(oceania, track.index = 1, col = "purple",
 
 highlight.sector(south_america, track.index = 1, col = "brown", 
     text = "South America", cex = 0.8, text.col = "white", niceFacing = TRUE)
-```
-
-```{r}
 
 #-- 
 circos.track(track.index = 2, panel.fun = function(x, y) {
@@ -1394,18 +1548,93 @@ page_data_for_all_pages_rh_tbl %>%
   arrange(Site) %>% 
   bind_cols(page_data_for_all_pages) %>% 
   mutate(inscription_year = as.Date(ISOdate(Year_num, 1, 1))) %>% 
-  mutate(diff_first_edit_inscription_year = as.numeric(ymd_hms(first_edit_date) - as.POSIXlt(inscription_year)) / 365 )
+  mutate(diff_first_edit_inscription_year = as.numeric( as.POSIXlt(inscription_year) - ymd_hms(first_edit_date) ) / 365 )
+
+page_data_for_random_rh_tbl_edit_start_end_span <- 
+randoms_revision_history_page_details %>% 
+  group_by(page) %>% 
+  summarise(first_edit_date = min(rh_date),
+            last_edit_date = max(rh_date),
+            edit_span = last_edit_date - first_edit_date) %>% 
+  mutate(page = as.numeric(page)) %>% 
+  arrange(page) 
+
+bind_rows(
+  
+  page_data_for_all_pages_rh_tbl_edit_start_end_span %>% 
+    select(edit_span) %>% 
+    mutate(source = "World Heritage"),
+  
+  page_data_for_random_rh_tbl_edit_start_end_span %>% 
+     select(edit_span) %>% 
+    mutate(source = "Random")
+  
+) %>% 
+  ggplot() +
+geom_density(aes(as.numeric(edit_span), 
+                 fill = source),
+                 alpha = 0.3) +
+  # scale_x_log10() +
+  scale_fill_viridis_d() +  
+  theme_minimal(base_size = 12) + 
+  xlab("Age of Wikipedia page (days)")
+
+ggsave("figures/wh_wikpedia_pages_ages.png")
+
+```
+
+Time between inscription year and first edit
+
+```{r}
+
+ggplot(page_data_for_all_pages_rh_tbl_edit_start_end_span,
+       aes(Year_num, 
+           diff_first_edit_inscription_year)) +
+  geom_jitter(alpha =  0.1, size = 3)  +
+  geom_vline(xintercept = 2001, colour = "red") +
+  geom_hline(yintercept = 0, colour = "red") +
+  theme_minimal(base_size = 12) + 
+  xlab("Year of inscription on World Heritage list") +
+  ylab("Difference between year of\ninscriptionand first edit on Wikipedia")
+
+ggplot(page_data_for_all_pages_rh_tbl_edit_start_end_span,
+       aes(Year_num, 
+           first_edit_date)) +
+  geom_jitter(alpha =  0.1, size = 3) +
+  theme_minimal(base_size = 12) + 
+  xlab("Year of inscription on World Heritage list") +
+  ylab("first edit on Wikipedia")
+
+
+ggplot(page_data_for_all_pages_rh_tbl_edit_start_end_span,
+       aes(Year_num)) +
+  geom_histogram() + 
+  theme_minimal(base_size = 12) +
+  scale_x_continuous(breaks = seq(1975, 2019, 1)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  xlab("Year of inscription on World Heritage list")
+
+ggsave("figures/wh_wikpedia_pages_inscription_year_hist.png")
 
 ggplot(page_data_for_all_pages_rh_tbl_edit_start_end_span, 
        aes(diff_first_edit_inscription_year)) +
   geom_histogram() +
   theme_minimal(base_size = 12)  +
-  geom_vline(xintercept = 0, colour = "red") +
-  ylim(0, 60) +
-  annotate("text", x = -10, y = 55, label = "Page appeared\nbefore inscription\n←", size = 10) +
-  annotate("text", x = 10,  y = 55, label = "Page appeared\nafter inscription\n→", size = 10)
-  
+  geom_segment(x = 0, xend = 0, y = 0, yend = 50, colour = "red") +
+   geom_segment(x = -10, xend = -10, y = 0, yend = 50, colour = "blue") +
+   geom_segment(x = -22, xend = -22, y = 0, yend = 50, colour = "blue") +
+  ylim(0, 70) +
+  annotate("text", x = 10, y = 59, label = "Page appeared\nbefore inscription\n→", size =8) +
+  annotate("text", x =-10,  y = 59, label = "Page appeared\nafter inscription\n←", size = 8) +
+  annotate("text", x =-22,  y = 5, label = "Inscribed in 1983→", 
+           size = 3, colour = "white", hjust = 1  ) +
+  annotate("text", x =-10,  y = 5, label = "Inscribed in 1994→", 
+           size = 3, colour = "white", hjust = 1 ) +
+  annotate("text", x =0,  y = 5, label = "Inscribed in 2001→", 
+           size = 3, colour = "white", hjust = 1 ) +
+  xlab("Difference between year of inscription on World Heritage list and first edit on Wikipedia")
 
+ggsave("figures/wh_wikpedia_pages_diff_time_inscription.png")
 
 ```
 
@@ -1424,6 +1653,7 @@ randoms_revision_history_page_details_ip_location %>%
   geom_line(aes(the_m,
              n)) +
   facet_wrap( ~ page, scales = "free")
+
 ```
 
 Spike detection
@@ -1529,16 +1759,6 @@ ggplot() +
   facet_wrap( ~ Site, scales = "free")
 ```
 
-
-
-
-## Technicity
-
-bots
-
-What do bots do?
-
-Do people undo bot actions often?
 
 
   - length of articles http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.451.4208&rep=rep1&type=pdf 

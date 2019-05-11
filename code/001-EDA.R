@@ -85,7 +85,8 @@ ggplot(pages_umap_output,
   geom_point(
     aes(colour = factor(hdbscan_out$cluster),
         size =  pages_umap_input_selected$page_wordcount_norm  ,
-        shape = pages_umap_input_rh$continent)) +
+        shape = pages_umap_input$continent
+        )) +
   scale_size(range = c(2,7), guide = FALSE) +
   scale_shape(name = "Continent") +
   scale_color_viridis_d(guide = FALSE) +
@@ -139,10 +140,10 @@ ggplot(var_imp_tbl,
 # plot plus subplot
 main_plot + 
   annotation_custom(ggplotGrob(sub_plot), 
-                    xmin = -10.0, 
-                    xmax = -2, 
-                    ymin=-7.5, 
-                    ymax=-3.5) 
+                    xmin = 3, 
+                    xmax = 6, 
+                    ymin= 6.5, 
+                    ymax= 3.5) 
 
 
 

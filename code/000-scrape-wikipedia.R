@@ -490,7 +490,28 @@ page_data_for_all_pages_result <- page_data_for_all_pages$result
 saveRDS(page_data_for_all_pages_result, 
         '../data/page_data_for_all_pages.rds')
 
+# get talk page content
 
+get_talk_page_content <- function(x){
+  if(x == "https://en.wikipedia.orgNA"){
+  content <- ""
+} else {
+  content <-
+    x %>% 
+    read_html() %>% 
+    html_nodes("#ca-talk a") %>% 
+    html_attr('href') %>% 
+    str_glue("https://en.wikipedia.org",.) %>% 
+    read_html() %>% 
+    html_nodes("#content") %>% 
+    html_text() 
+}
+return(content)
+}
+
+wh_wiki_table_talk_page_content <- 
+  map(wh_wiki_table$site_page_link, 
+      ~get_talk_page_content(.x))
 
 
 
