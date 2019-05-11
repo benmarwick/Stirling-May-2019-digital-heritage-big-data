@@ -18,8 +18,8 @@ n_and_c_asia <- "https://en.wikipedia.org/wiki/List_of_World_Heritage_Sites_in_N
 w_asia <- "https://en.wikipedia.org/wiki/List_of_World_Heritage_Sites_in_Western_Asia"
 e_asia <- "https://en.wikipedia.org/wiki/List_of_World_Heritage_sites_in_Eastern_Asia"
 s_asia <- "https://en.wikipedia.org/wiki/List_of_World_Heritage_sites_in_Southern_Asia"
-# SE Asia list currently removed due to copyvio :(
-se_asia <- "https://en.wikipedia.org/w/index.php?title=List_of_World_Heritage_Sites_in_Southeast_Asia&direction=prev&oldid=878049179"
+se_asia <- "https://en.wikipedia.org/wiki/List_of_World_Heritage_Sites_in_Southeast_Asia"
+# # SE Asia list currently removed due to copyvio :( "https://en.wikipedia.org/w/index.php?title=List_of_World_Heritage_Sites_in_Southeast_Asia&direction=prev&oldid=878049179"
 
 # Europe
 n_europe <- "https://en.wikipedia.org/wiki/List_of_World_Heritage_Sites_in_Northern_Europe"
@@ -75,8 +75,8 @@ which_table_has_the_sites <-
 } else {
   
   # the SE Asia table is troublesome 
-  region_table_xml <- region_table_xml_all_tables[3]
-  region_table_xml_table <- html_table(region_table_xml)[[1]]
+  region_table_xml <- region_table_xml_all_tables[2]
+  region_table_xml_table <- html_table(region_table_xml, fill = TRUE)[[1]]
 }
   
   # filter so we only keep the cultural sites
@@ -148,8 +148,6 @@ tbl_n_and_c_asia  <-  map_df(n_and_c_asia,   get_table_of_sites_per_region)
 tbl_w_asia  <-        map_df(w_asia ,   get_table_of_sites_per_region) 
 tbl_e_asia  <-        map_df(e_asia ,   get_table_of_sites_per_region) 
 tbl_s_asia  <-        map_df(s_asia ,   get_table_of_sites_per_region) 
-
-# special handling needed
 tbl_se_asia  <-       map_df(se_asia ,   get_table_of_sites_per_region) 
 
 tbl_n_europe <-       map_df(n_europe,   get_table_of_sites_per_region) 
@@ -220,31 +218,6 @@ country_site_page_ratio <-
          total = no_page + has_page) %>% 
   mutate(ratio_sites_with_pages = has_page / total) %>% 
   filter(!is.na(total))
-
-
-# spatial distribution of sites with no page
-library(tmap)
-data("World")
-
-# tmap_mode("view") # for interactive
-tmap_mode("plot")
-
-tm_map_data <- 
-World %>% 
-  left_join(country_site_page_ratio,
-            by = c( 'name' = 'country'))
-
-tm_shape(tm_map_data) +
-  tm_polygons("ratio_sites_with_pages",
-              palette='viridis',
-              popup.vars = 'name') +
-  tm_shape(tm_map_data) +
-  tm_symbols(col = "red", 
-             alpha = 0.1,
-             size = "total", 
-             scale = 2)
-
-
 
 
 
@@ -405,19 +378,17 @@ get_data_about_page <- function(the_page) {
                                    n[revert==1] / sum(n))) %>% 
     pull(revert_prop)
   
-  talk_page_wordcount <- function(the_page){
+  talk_page_text <- 
     the_page %>% 
-      read_html() %>% 
-      html_nodes("#ca-talk a") %>% 
-      html_attr('href') %>% 
-      str_glue("https://en.wikipedia.org",.) %>% 
-      read_html() %>% 
-      html_nodes("#content") %>% 
-      html_text() %>% 
-      stringi::stri_count_words()
-  }
+    read_html() %>% 
+    html_nodes("#ca-talk a") %>% 
+    html_attr('href') %>% 
+    str_glue("https://en.wikipedia.org",.) %>% 
+    read_html() %>% 
+    html_nodes("#content") %>% 
+    html_text() 
   
-  talk_page_wordcount_result <- talk_page_wordcount(the_page)
+  talk_page_wordcount_result <- stringi::stri_count_words(talk_page_text)
   
   n_days <- 100
   page_views_end <- str_remove_all(Sys.Date() - 1, "-")
@@ -454,6 +425,7 @@ get_data_about_page <- function(the_page) {
               rh_diff_size_cv = rh_diff_size_cv,
               rh_user_bot_prop = rh_user_bot_prop,
               rh_revert_prop = rh_revert_prop,
+              talk_page_text = talk_page_text,
               talk_page_wordcount = talk_page_wordcount_result, 
               page_views_last_n_days_total = page_views_last_n_days_total))
   
@@ -502,7 +474,7 @@ get_various_page_data_for_all_pages_safe <-
          otherwise = "some_problem")
 
 
-wh_wiki_table <- readr::read_csv("../data/wh_wiki_table.csv")
+wh_wiki_table <- readr::read_csv("data/wh_wiki_table.csv")
 
 # this takes several hours
 page_data_for_all_pages <- 
