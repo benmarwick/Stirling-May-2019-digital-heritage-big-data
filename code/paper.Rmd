@@ -307,7 +307,7 @@ ggsave("figures/wh_country_wikpedia_pages_ratio_map.png")
 ```
 
 
-## Basic qualities of the WP articles about WH sites
+## Basic qualities of the content of WP articles about WH sites
 
 ```{r}
 ten_k_random_wp_pages_basic_qualities <- 
@@ -399,7 +399,7 @@ labeller <- function(variable,value){
 
 ```
 
-## Basic qualities of consumption of articles
+## Basic qualities of the consumption of WP articles about WH sites
 
 number of links in
 page_views_last_n_days_total
@@ -494,7 +494,7 @@ page_data_for_all_pages %>%
 ggsave("figures/wh_wikpedia_pages_consumption_scatterplot.png")
 ```
 
-## Basic qualities of the editing process
+## Basic qualities of the editing process of WP articles about WH sites
 
 number of edits, total, edit density (prop/words), size of edits
 how many bot edits, how many reverts per page
@@ -830,6 +830,34 @@ Reverts
 
 ```{r}
 
+bind_rows(
+page_data_for_all_pages_rh_tbl %>% 
+  mutate(revert = ifelse(revert, 1, 0)) %>%
+  group_by(Site) %>% 
+  summarise( n_revert_edits = sum(revert),
+             n_edits = n()) %>% 
+  mutate(prop_revert_edits = n_revert_edits / n_edits,
+           Site = "World Heritage Sites"),
+
+ten_k_random_wp_pages_revision_history_page_details %>% 
+  mutate(revert = ifelse(revert, 1, 0)) %>%
+  group_by(Site) %>% 
+  summarise( n_revert_edits = sum(revert),
+             n_edits = n()) %>% 
+  mutate(prop_revert_edits = n_revert_edits / n_edits, 
+         Site = "Random pages")
+) %>% 
+  
+   ggplot(aes(prop_revert_edits,
+             fill = Site)) +
+  geom_density(alpha = 0.3) +
+  scale_x_log10() +
+  scale_fill_viridis_d(labels = c("Random", 
+                               "World Heritage")) +
+  labs(x = "Proportion of reverting edits per article",
+       fill = "Wikipedia pages") +
+  theme_minimal() 
+
 ```
 
 
@@ -886,7 +914,7 @@ ggplot(wh_pages_talk_page_length,
     direction     = "both"
   ) +
   scale_y_log10() +
-  scale_x_log10() +
+  scale_x_log10(labels = scales::comma_format(accuracy = 1)) +
   coord_fixed(1) +
   scale_color_viridis_c(name = "Talk page word count", 
                         labels = c(5000, 10000, 15000, 20000),
@@ -904,6 +932,11 @@ ggsave("figures/wh_wikpedia_pages_talk_page_wordcount_reverts_scatterplot.png")
 
 ```
 
+Talk page topic modelling 
+
+```{r}
+
+```
 
 
 ## Locality  
@@ -1244,7 +1277,7 @@ ggplot(ten_k_random_wp_pages,
 
 ```
 
-What are the keywords for controversy in edit messages? And how common are these warrning messages?
+What are the keywords for controversy in edit messages? And how common are these warring messages?
 
 ```{r}
 randoms_revision_history_page_details_ip_warring_words <- 
@@ -1342,6 +1375,40 @@ ggplot(randoms_revision_history_page_details_ip_time_diffs,
   geom_histogram()
 
 ```
+
+
+## Temporal patterns
+
+Page ages: are WH pages younger than the typical WP page? What's their relationship to their inscription year?
+
+```{r}
+# get first and last edit, and inscription year
+library(lubridate)
+page_data_for_all_pages_rh_tbl_edit_start_end_span <- 
+page_data_for_all_pages_rh_tbl %>% 
+  group_by(Site) %>% 
+  summarise(first_edit_date = min(rh_date),
+            last_edit_date = max(rh_date),
+            edit_span = last_edit_date - first_edit_date) %>% 
+  mutate(Site = as.numeric(Site)) %>% 
+  arrange(Site) %>% 
+  bind_cols(page_data_for_all_pages) %>% 
+  mutate(inscription_year = as.Date(ISOdate(Year_num, 1, 1))) %>% 
+  mutate(diff_first_edit_inscription_year = as.numeric(ymd_hms(first_edit_date) - as.POSIXlt(inscription_year)) / 365 )
+
+ggplot(page_data_for_all_pages_rh_tbl_edit_start_end_span, 
+       aes(diff_first_edit_inscription_year)) +
+  geom_histogram() +
+  theme_minimal(base_size = 12)  +
+  geom_vline(xintercept = 0, colour = "red") +
+  ylim(0, 60) +
+  annotate("text", x = -10, y = 55, label = "Page appeared\nbefore inscription\n←", size = 10) +
+  annotate("text", x = 10,  y = 55, label = "Page appeared\nafter inscription\n→", size = 10)
+  
+
+
+```
+
 
 time series of edits: breakouts relating to events? monthly seems like a good level of aggregation. What can we do for spike detection?
  
