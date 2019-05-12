@@ -1574,6 +1574,7 @@ south_america  <-  get_countries_in_continent("South America")
 
 library(circlize)
 circos.clear()
+png("figures/chord_fig.png", res = 300, width = 2500, height = 2500)
 chordDiagram(adjacency_list, 
              directional = 1,
              direction.type = c("diffHeight", "arrows"),
@@ -1588,10 +1589,11 @@ circos.track(track.index = 1, panel.fun = function(x, y) {
         facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5))
 }, bg.border = NA) # here set bg.border to NA is important
 
+dev.off()
 
 ```
 
-```{r}
+```{r eval=FALSE}
 
 # stuff that doesn't work
 
@@ -1669,11 +1671,6 @@ editors
 ## Controversies
 
 Look at distributions of variables, then say 2sd is extreme, and match those to the WH pages to find out what they are
-
-
-
-```{r}
-```
 
 
 
@@ -1960,7 +1957,7 @@ ggplot() +
   
 ```
 
-for WH sites
+for WH sites, look for editing anomalies using all editors, put a line on for inscpription year so we can see if there are peaks in activity around inscription. 
 
 ```{r}
 
@@ -1981,17 +1978,16 @@ ggplot(revision_history_page_details_ip_addresses_df_monthly_edits,
 
 # subset so we get only sites with > n1 edits/month, and at least 3 months worth of edits
 
-n1 <- 7  # edits per month
-n2 <- 20 # months worth of edits
+n1 <- 10  # edits per month
+n2 <- 12 # months worth of edits
 revision_history_page_details_ip_addresses_df_monthly_edits_10 <- 
 revision_history_page_details_ip_addresses_df_monthly_edits %>% 
   filter(max(n) >= n1) %>% 
   group_by(Site) %>% 
   filter(n() >= n2) 
-
 ```
 
-
+Anomalies in editing activity 
 
 ```{r}
 
@@ -2006,7 +2002,7 @@ revision_history_page_details_ip_addresses_df_monthly_edits_anoms <-
                                       threshold = "p95"))) %>% 
   unnest(anomalies) %>% 
   group_by(Site) %>% 
-  filter(max(anoms) >= 10) # where the anomaly is n edits/month or more
+  filter(max(anoms) >= 50) # where the anomaly is n edits/month or more
 
 ggplot() +
   geom_line(
@@ -2019,7 +2015,8 @@ ggplot() +
     aes(timestamp, anoms), 
     color="#cb181d", alpha=1/3) +
   scale_x_datetime(date_labels="%b\n%Y") +
-  facet_wrap( ~ Site, scales = "free")
+  facet_wrap( ~ Site, scales = "free") +
+  theme_minimal()
 ```
 
 
