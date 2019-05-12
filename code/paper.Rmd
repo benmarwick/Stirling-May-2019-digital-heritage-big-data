@@ -1243,7 +1243,10 @@ topic_model <- stm(talk_dfm, K = 60,
                    verbose = FALSE, 
                    init.type = "Spectral")
 
+png(filename = "figures/wh_talk_pages_top_topics.png", width = 1800, height = 2600, res = 300)
+par(bty="n",col="grey40",lwd=10)
 plot(topic_model,  text.cex = 0.75)
+dev.off()
 
 td_beta <- tidy(topic_model)
 
