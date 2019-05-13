@@ -2,7 +2,7 @@
 title: "Community Data Science meets Digital Heritage: Controversies about World Heritage Sites in the Online Community of Wikipedia"
 ---
 
-Load the data
+## Load the data
 
 ```{r}
 library(tidyverse)
@@ -51,7 +51,7 @@ theme_nogrid <- function (base_size = 12, base_family = "") {
 }
 ```
 
-## Some sort of clustering
+## Overall clusters
 
 ```{r}
 normalize = function(x) (x-min(x))/(max(x)-min(x))
@@ -304,6 +304,7 @@ wh_wiki_table_location <-
   
 ```
 
+## More maps
 
 ```{r}
 
@@ -348,7 +349,7 @@ ggplot(wh_wk_country_counts,
   xlab("")
 ```
 
-Here's a map of countries showing which has the most WP pages for WH sites
+## Here's a map of countries showing which has the most WP pages for WH sites
 
 ```{r}
 sf_map_data <- 
@@ -382,7 +383,7 @@ wh_wk_country_count_map +
 ggsave("figures/wh_country_wikpedia_pages_count_map.png")
 ```
 
-Map of the ratio of WH sites with WP pages, per country
+## Map of the ratio of WH sites with WP pages, per country
 
 ```{r}
 wh_wiki_table_location_prop <- 
@@ -442,7 +443,6 @@ wh_wk_country_prop_map +
 
 ggsave("figures/wh_country_wikpedia_pages_ratio_map.png")
 ```
-
 
 ## Basic qualities of the content of WP articles about WH sites
 
@@ -512,6 +512,8 @@ labeller <- function(variable,value){
   
   ggsave("figures/wh_wikpedia_pages_basic_content.png")
 ```
+
+# basic qualities scatterplot
 
 ```{r}
 # scatterplots
@@ -589,7 +591,7 @@ labeller <- function(variable,value){
 ggsave("figures/wh_wikpedia_pages_consumption.png")
 ```
 
-Scatterplot showing the WP sites that get the most attention 
+## Scatterplot showing the WP sites that get the most attention 
   
 ```{r}
 library(ggrepel)
@@ -689,7 +691,7 @@ bind_rows(revision_history_page_details %>%
 ggsave("figures/wh_wikpedia_edits_per_page.png")
 ```
 
-Edits per 1k words, as a measure of edit density
+## Edits per 1k words, as a measure of edit density
 
 ```{r}
 revision_history_page_details_wordcount <- 
@@ -722,7 +724,7 @@ bind_rows(revision_history_page_details_wordcount %>%
 ggsave("figures/wh_wikpedia_edits_density_page.png")
 ```
 
-Number of unique editors per page
+## Number of unique editors per page
 
 ```{r}
 # plot both samples, number of edits per page
@@ -745,7 +747,7 @@ bind_rows(revision_history_page_details %>%
 ggsave("figures/wh_wikpedia_editors_per_page.png")
 ```
 
-Number of unique editors per 1k words per page
+## Number of unique editors per 1k words per page
 
 ```{r}
 revision_history_page_details_wordcount <- 
@@ -777,7 +779,7 @@ bind_rows(revision_history_page_details_wordcount %>%
 ggsave("figures/wh_wikpedia_editors_density_page.png")
 ```
 
-Size of edits, absolute and raw
+## Size of edits, absolute and raw
 
 ```{r}
 page_data_for_all_pages_rh_tbl <- 
@@ -821,7 +823,7 @@ bind_rows(page_data_for_all_pages_rh_tbl %>%
 ggsave("figures/wh_wikpedia_edit_sizes.png")
 ```
 
-How many edits made by bots? Proportion of edits per page made by bots
+## How many edits made by bots? Proportion of edits per page made by bots
 
 ```{r}
 bind_rows(
@@ -855,7 +857,7 @@ summarise( n_bot_edits = sum(bot),
 ggsave("figures/wh_wikpedia_edits_by_bots.png")
 ```
 
-Which WH pages are most edited by bots?
+## Which WH pages are most edited by bots?
 
 ```{r}
 library(ggrepel)
@@ -902,7 +904,7 @@ wh_bots <-
 ggsave("figures/wh_wikpedia_pages_bot_edits_scatterplot.png")
 ```
 
-which bots are most active on WH pages vs random pages?
+## which bots are most active on WH pages vs random pages?
 Cydebot: category edits
 Smackbot: dates in templates
 ClueBot NG: vandalism
@@ -934,7 +936,7 @@ ten_k_random_wp_pages_revision_history_page_details %>%
 ggsave("figures/wh_wikpedia_what_bots.png")
 ```
 
-So about vandalism? do WH sites get more than random ones?
+## So about vandalism? do WH sites get more than random ones?
 
 ```{r}
 bind_rows(
@@ -969,7 +971,7 @@ ggsave("figures/wh_wikpedia_vandalism_edits.png")
 
 ```
 
-Which WH pages have the most vandalism?
+## Which WH pages have the most vandalism?
 
 ```{r}
 
@@ -1017,7 +1019,7 @@ ggsave("figures/wh_wikpedia_pages_vandal_edits_scatterplot.png")
 
 ```
 
-Reverts
+## Reverts
 
 ```{r}
 
@@ -1053,7 +1055,7 @@ ggsave("figures/wh_wikpedia_pages_revert_edits.png")
 
 ```
 
-Which articles have the most reverts?
+## Which articles have the most reverts?
 
 ```{r}
 
@@ -1091,7 +1093,7 @@ ggplot(revision_history_page_details,
 ggsave("figures/wh_wikpedia_pages_reverts_edits_scatterplot.png")
 ```
 
-Is there a correlation between reverts and vandalism?
+## Is there a correlation between reverts and vandalism?
 
 ```{r}
 left_join(page_data_for_all_pages, vandal_edits) %>% 
@@ -1108,9 +1110,7 @@ ggsave("figures/wh_wikpedia_pages_reverts_vandal_edits_scatterplot.png")
 
 ```
 
-
-
-What's the typical distribution of talk page length? 
+## What's the typical distribution of talk page length? 
 
 ```{r}
 bind_rows(
@@ -1137,7 +1137,7 @@ page_data_for_all_pages %>%
 ggsave("figures/wh_wikpedia_pages_talk_page_worcount.png")
 ```
 
-which WH pages have the longest talk pages?
+## which WH pages have the longest talk pages?
 
 ```{r}
 
@@ -1181,7 +1181,7 @@ ggsave("figures/wh_wikpedia_pages_talk_page_wordcount_reverts_scatterplot.png")
 
 ```
 
-Talk page topic modelling 
+## Talk page topic modelling 
 
 ```{r}
 library(tidytext)
@@ -1272,7 +1272,7 @@ td_beta %>%
 ggsave("figures/wh_wikpedia_pages_talk_page_topics.png")
 ```
 
-The probability that each document is generated from each topic.
+## The probability that each document is generated from each topic.
 
 ```{r}
 td_gamma <- tidy(topic_model, matrix = "gamma",                    
@@ -1287,7 +1287,7 @@ ggplot(td_gamma, aes(gamma, fill = as.factor(topic))) +
 
 ```
 
-we may want to know which topics are associated with each talk page?
+## we may want to know which topics are associated with each talk page?
 
 ```{r}
 topic_model_gamma <- tidy(topic_model, matrix = "gamma")
@@ -1300,8 +1300,7 @@ topic_model_gamma %>%
   facet_wrap(~ title)
 ```
 
-
-Topic correlations
+## Topic correlations
 
 ```{r}
 mod.out.corr <- topicCorr(topic_model)
@@ -1331,11 +1330,9 @@ ggraph(g, layout = "lgl") +
 ggsave("figures/wh_talk_page_topic_correlation_network.png")
 ```
 
-
-
 ## Spatial patterns  
 
-IP addresses
+## IP addresses
 
 ```{r}
 
@@ -1358,7 +1355,7 @@ Do WH sites have more geographically diverse contributions?
 
 Get locations for random pages.
 
-How many IP edits on each page?
+## How many IP edits on each page?
 
 ```{r}
 randoms_revision_history_page_details <- 
@@ -1401,7 +1398,7 @@ ggplot(both_ip_props,
 ggsave("figures/proportion_of_IP_edits.png")
 ```
 
-Overall location of IP edits for all random pages
+## Overall location of IP edits for all random pages
 
 ```{r}
 randoms_revision_history_page_details_ip_location <- 
@@ -1426,7 +1423,7 @@ ggplot(randoms_revision_history_page_details_ip_location_tally,
   scale_y_continuous(labels = scales::comma)
 ```
 
-What's the geographic diversity of edits per random page?
+## What's the geographic diversity of edits per random page?
 
 ```{r}
 randoms_revision_history_page_details_ip_location_props_per_page <- 
@@ -1523,6 +1520,8 @@ ggplot(revision_history_page_details_ip_addresses_countries,
   coord_equal()
 
 ```
+
+## Circular chord plot
 
 ```{r}
 adjacency_list_3_cols <- 
@@ -1672,14 +1671,8 @@ editors
 
 Look at distributions of variables, then say 2sd is extreme, and match those to the WH pages to find out what they are
 
-
-
 Can we detect -ve sentiment on the talk pages? Perhaps as distributions, over every 100 words per page
 
-```{r}
-library(tidytext)
-
-```
 
 What's the typical distribution of the proportion of edits that are reverts?
 
@@ -1743,7 +1736,7 @@ ggplot(randoms_revision_history_page_details_ip_warring_words_prop_revert_prop,
   geom_point()
 ```
 
-time between edits
+## time between edits
 
 ```{r}
 library(lubridate)
@@ -1793,7 +1786,7 @@ ggplot(randoms_revision_history_page_details_ip_time_diffs,
 
 ## Temporal patterns
 
-Page ages: are WH pages younger than the typical WP page? What's their relationship to their inscription year?
+## Page ages: are WH pages younger than the typical WP page? What's their relationship to their inscription year?
 
 ```{r}
 # get first and last edit, and inscription year
@@ -1831,19 +1824,20 @@ bind_rows(
   
 ) %>% 
   ggplot() +
-geom_density(aes(as.numeric(edit_span), 
+geom_density(aes(as.numeric(edit_span / 365), 
                  fill = source),
                  alpha = 0.3) +
-  # scale_x_log10() +
+  geom_vline(xintercept = year(Sys.Date()) - 2001, 
+             colour = "red") +
+  annotate("text", x = 15, y = 0.2, label = "start of Wikipedia → ") +
   scale_fill_viridis_d() +  
   theme_minimal(base_size = 12) + 
-  xlab("Age of Wikipedia page (days)")
+  xlab("Age of Wikipedia page (years)")
 
 ggsave("figures/wh_wikpedia_pages_ages.png")
-
 ```
 
-Time between inscription year and first edit
+## Time between inscription year and first edit
 
 ```{r}
 
@@ -1899,24 +1893,46 @@ ggsave("figures/wh_wikpedia_pages_diff_time_inscription.png")
 ```
 
 
-time series of edits: breakouts relating to events? monthly seems like a good level of aggregation. What can we do for spike detection?
- 
-```{r}
-randoms_revision_history_page_details_ip_location %>% 
-  group_by(page) %>% 
-  mutate(the_d = floor_date(rh_date, "day")) %>% 
-    mutate(the_m = floor_date(rh_date, "month")) %>% 
-  group_by(page, the_m) %>% 
-  tally() %>% 
-  filter(n() > 130) %>%   # explore this value
-  ggplot() +
-  geom_line(aes(the_m,
-             n)) +
-  facet_wrap( ~ page, scales = "free")
+`all_the_data_to_load_quickly.RData` is up to here
 
+```{r}
+load("data/all_the_data_to_load_quickly.RData")
+
+# remove some big items
+rm(list = ls(pattern = "random"))
+library(tidyverse)
+library(lubridate)
 ```
 
-Spike detection
+
+## time series of edits: breakouts relating to events? monthly seems like a good level of aggregation. What can we do for spike detection?
+ 
+```{r}
+wh_pages_edit_time_series <- 
+wh_pages_talk_page_length %>% 
+  unnest(revision_history_page_details) %>% 
+  filter(Year_num >= 2001) %>% # only sites inscribed after WP started
+  group_by(Site) %>% 
+  mutate(the_d = floor_date(rh_date, "day")) %>% 
+    mutate(the_m = floor_date(rh_date, "month")) %>% 
+  group_by(Site, the_m) %>% 
+  tally() %>% 
+  filter(n() > 100) %>% # explore this value
+  left_join(wh_pages_talk_page_length) %>% 
+  mutate(vline_year = ifelse(Year_num >= 2001, Year_num, NA)) %>% 
+  mutate(vline_year = ymd_hms(ISOdatetime(vline_year, 1, 1, 1, 0, 0)))
+
+ggplot(wh_pages_edit_time_series) +
+  geom_vline(aes(xintercept = vline_year), colour = "red") +
+  geom_line(aes(the_m,
+             n)) +
+  facet_wrap( ~ str_wrap(Site, 30), scales = "free") +
+  theme_minimal(base_size = 6)
+
+ggsave("figures/wh_wikpedia_pages_edit_time_series.png", h = 9, w = 12)
+```
+
+## Spike detection
 
 for randoms, what even is an anomaly? 
 
@@ -1930,7 +1946,7 @@ randoms_revision_history_page_details_ip_location %>%
     mutate(the_m = floor_date(rh_date, "month")) %>% 
   group_by(page, the_m) %>% 
   tally() %>% 
-  filter(n() > 150) # explore this value
+  filter(n() > 200) # explore this value
 
 randoms_revision_history_page_details_ip_location_monthly_anom <- 
   randoms_revision_history_page_details_ip_location_monthly %>% 
