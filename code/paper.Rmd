@@ -1145,7 +1145,6 @@ wh_pages_talk_page_length <-
 left_join(page_data_for_all_pages,
           revision_history_page_details_wordcount) 
 
-
 ggplot(wh_pages_talk_page_length,
          aes(rh_n_edits,
              rh_revert_prop,
@@ -1186,9 +1185,15 @@ ggsave("figures/wh_wikpedia_pages_talk_page_wordcount_reverts_scatterplot.png")
 ```{r}
 library(tidytext)
 
-tidy_talk <- 
+tidy_talk_raw <- 
 enframe(unlist(wh_wiki_talk_pages)) %>% 
-  mutate(clean_text = str_remove_all(value, "\n|\t")) %>% 
+  bind_cols(wh_wiki_table)
+
+write.csv(tidy_talk_raw$value , "data/wh_wiki_talk_page_text.txt")
+
+tidy_talk <- 
+  tidy_talk_raw %>% 
+    mutate(clean_text = str_remove_all(value, "\n|\t")) %>% 
   unnest_tokens(word, clean_text) %>% 
   anti_join(stop_words) %>% 
   filter(!word %in% c("article", "page", "talk", "utc", 
@@ -1205,6 +1210,13 @@ enframe(unlist(wh_wiki_talk_pages)) %>%
   filter(!str_detect(word, "articles")) %>% 
   filter(!str_detect(word, "jump")) %>% 
   filter(!str_detect(word, "\\."))
+
+# check which sites have some words
+tidy_talk %>% 
+  filter(word == "unesco") %>% 
+  group_by(Site) %>% 
+  tally(sort = T)
+
   
 # top words
 tidy_talk %>% 
@@ -1892,6 +1904,8 @@ ggsave("figures/wh_wikpedia_pages_diff_time_inscription.png")
 
 ```
 
+
+# reload data 
 
 `all_the_data_to_load_quickly.RData` is up to here
 
