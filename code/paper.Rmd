@@ -2,6 +2,9 @@
 title: "Community Data Science meets Digital Heritage: Controversies about World Heritage Sites in the Online Community of Wikipedia"
 ---
 
+git filter-branch --tree-filter 'rm -rf Marwick-Stirling-May-2019-digital-heritage-big-data.pptx' HEAD
+
+Marwick-Stirling-May-2019-digital-heritage-big-data.pptx
 
 ## Load the data
 
