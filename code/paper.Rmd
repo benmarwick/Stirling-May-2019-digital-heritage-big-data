@@ -1512,6 +1512,8 @@ ggplot(revision_history_page_details_ip_addresses_countries,
   geom_histogram() +
   theme_minimal(base_size = 12) +
   xlab("Proportion of all edits that are anonymous")
+
+ggsave("figures/wh_wikipedia_pages_anon_edits_prop.png")
 ```
 
 ```{r}
