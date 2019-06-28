@@ -2,14 +2,6 @@
 title: "Community Data Science meets Digital Heritage: Controversies about World Heritage Sites in the Online Community of Wikipedia"
 ---
 
-How to get rid of a too-large file in the Git commit history:
-
-git rm --cached Marwick-Stirling-May-2019-digital-heritage-big-data.pptx
-
-git filter-branch --force --tree-filter 'rm -rf Marwick-Stirling-May-2019-digital-heritage-big-data.pptx' HEAD
-
-
-
 ## Load the data
 
 ```{r}
