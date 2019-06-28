@@ -1,6 +1,7 @@
 ---
 title: "Community Data Science meets Digital Heritage: Controversies about World Heritage Sites in the Online Community of Wikipedia"
 ---
+try ten_k_random_wp_pages_revision_history_page_details_summary_tbl
 
 ## Load the data
 
@@ -14,23 +15,23 @@ ten_k_random_wp_pages <- readRDS(here::here("data", "random_page_data_tbl.rds"))
 ten_k_random_wp_pages_lst <- readRDS(here::here("data", "random_page_data_lst.rds"))
 
 # all WH sites with WP pages (n = 584)
-page_data_for_all_pages <- 
-  readRDS(here::here("data", 
+page_data_for_all_pages <-
+  readRDS(here::here("data",
                      "page_data_for_all_pages.rds"))
 
 # all WH sites, with and without WP pages (n = 846)
-wh_wiki_table <- 
-  read_csv(here::here("data", 
+wh_wiki_table <-
+  read_csv(here::here("data",
                       "wh_wiki_table.csv"))
 
 # the talk pages for all WH sites, with WP pages (n = 846)
-wh_wiki_talk_pages <-  readRDS(here::here("data", 
+wh_wiki_talk_pages <-  readRDS(here::here("data",
                      "wh_wiki_table_talk_page_content.rds"))
 
 # all WH sites according to UNESCO
 # from https://whc.unesco.org/en/syndication
 wh_unesco <- readxl::read_excel(here::here("data",
-                                           "whc-sites-2018.xls")) %>% 
+                                           "whc-sites-2018.xls")) %>%
   filter(category %in% c("Cultural", "Mixed"))
 
 library("rnaturalearth")
@@ -45,8 +46,8 @@ estimate_mode <- function(x) {
 }
 
 theme_nogrid <- function (base_size = 12, base_family = "") {
-  theme_bw(base_size = base_size, 
-           base_family = base_family) %+replace% 
+  theme_bw(base_size = base_size,
+           base_family = base_family) %+replace%
     theme(panel.grid = element_blank() )   
 }
 ```
@@ -58,15 +59,15 @@ normalize = function(x) (x-min(x))/(max(x)-min(x))
 
 #--------------------------------------------------------------------------
 # take a look at the distribution of page variables
-some_page_variables <- 
-  page_data_for_all_pages %>% 
-  select(page_wordcount, 
+some_page_variables <-
+  page_data_for_all_pages %>%
+  select(page_wordcount,
          page_wikilinks_out,
          page_wikilinks_in,
-         page_cited_items_on) %>% 
+         page_cited_items_on) %>%
   mutate(page_wikilinks_out_per_word = page_wikilinks_out / page_wordcount,
-         page_cited_items_on_per_word = page_cited_items_on / page_wordcount) 
-  
+         page_cited_items_on_per_word = page_cited_items_on / page_wordcount)
+
 
 
 # umap
@@ -74,50 +75,50 @@ library(uwot)
 library("tmap")
 data("World")
 
-pages_umap_input <- 
-  some_page_variables  %>% 
+pages_umap_input <-
+  some_page_variables  %>%
   mutate(page_wordcount_norm = normalize(page_wordcount),
          page_wikilinks_in_norm= normalize(page_wikilinks_in),
          page_wikilinks_out_per_word_norm = normalize(page_wikilinks_out_per_word),
-         page_cited_items_on_per_word_norm = normalize(page_cited_items_on_per_word)) %>% 
+         page_cited_items_on_per_word_norm = normalize(page_cited_items_on_per_word)) %>%
   select(-page_wordcount,
-         -page_cited_items_on, 
+         -page_cited_items_on,
          -page_wikilinks_out,
          -page_wikilinks_in,
          -page_wikilinks_out_per_word,
-         -page_cited_items_on_per_word) %>% 
-  bind_cols(., page_data_for_all_pages[ , 'country'] ) %>% 
-  filter_all(all_vars(!is.na(.))) %>% 
-  left_join(World %>% 
-              select(name, continent), 
+         -page_cited_items_on_per_word) %>%
+  bind_cols(., page_data_for_all_pages[ , 'country'] ) %>%
+  filter_all(all_vars(!is.na(.))) %>%
+  left_join(World %>%
+              select(name, continent),
             by = c('country' = 'name'))
 
 # compute umap
 
-pages_umap_input_selected <- 
-  pages_umap_input %>% 
-  select(-country, 
+pages_umap_input_selected <-
+  pages_umap_input %>%
+  select(-country,
          -continent,
          -geometry
          )  
-    
-pages_umap_output <- 
-  pages_umap_input_selected %>% 
-  umap(., 
-       n_neighbors = 60, 
+
+pages_umap_output <-
+  pages_umap_input_selected %>%
+  umap(.,
+       n_neighbors = 60,
        min_dist = 0.7,
        nn_method = "annoy",
-       init = "spca") %>% 
+       init = "spca") %>%
   as_tibble()
 
 # compute hdbscan clusters
 library(dbscan)
-hdbscan_out <- hdbscan(pages_umap_output, 
+hdbscan_out <- hdbscan(pages_umap_output,
                        minPts = 5)
 
 table(hdbscan_out$cluster)
 
-main_plot <- 
+main_plot <-
 ggplot(pages_umap_output,
        aes(V1, V2)) +
   geom_point(
@@ -131,14 +132,14 @@ ggplot(pages_umap_output,
   theme_minimal() +
   theme(legend.position = c(0.1, 0.8)) +
   xlab("") +
-  ylab("") 
+  ylab("")
 
-# train a feature-selecting classificator like random forests on 
+# train a feature-selecting classificator like random forests on
 # the cluster labels
 
-rand_forest_input <- 
-  pages_umap_input_selected %>% 
-  mutate(clus = hdbscan_out$cluster) %>% 
+rand_forest_input <-
+  pages_umap_input_selected %>%
+  mutate(clus = hdbscan_out$cluster) %>%
   filter(clus != 0)
 
 library(caret)
@@ -147,9 +148,9 @@ fit <- train(
   clus ~ .,
   data = rand_forest_input,
   method = "ranger",
-  trControl = trainControl(method="cv", 
-                            number = 10, 
-                            allowParallel = TRUE, 
+  trControl = trainControl(method="cv",
+                            number = 10,
+                            allowParallel = TRUE,
                             verbose = TRUE),
   importance = 'permutation')
 
@@ -158,12 +159,12 @@ var_imp_tbl <- tibble(var = row.names(varImp(fit)$importance),
                       imp = varImp(fit)$importance$Overall)
 
 theme_nogrid <- function (base_size = 12, base_family = "") {
-  theme_bw(base_size = base_size, 
-           base_family = base_family) %+replace% 
+  theme_bw(base_size = base_size,
+           base_family = base_family) %+replace%
     theme(panel.grid = element_blank() )   
 }
 
-sub_plot <- 
+sub_plot <-
 ggplot(var_imp_tbl,
        aes(reorder( var, -imp ),
            imp)) +
@@ -174,12 +175,12 @@ ggplot(var_imp_tbl,
   theme_nogrid(base_size = 6)
 
 # plot plus subplot
-main_plot + 
-  annotation_custom(ggplotGrob(sub_plot), 
-                    xmin = 3, 
-                    xmax = 6, 
-                    ymin= 6.5, 
-                    ymax= 3.5) 
+main_plot +
+  annotation_custom(ggplotGrob(sub_plot),
+                    xmin = 3,
+                    xmax = 6,
+                    ymin= 6.5,
+                    ymax= 3.5)
 
 ggsave("figures/wh_country_umap_hdbscan.png")
 ```
@@ -190,9 +191,9 @@ Where are the WH sites, before looking into WP
 
 ```{r}
 
-wh_unesco_countries <- 
-wh_unesco %>% 
-  separate_rows(states_name_en, convert = TRUE, sep = ",") %>% 
+wh_unesco_countries <-
+wh_unesco %>%
+  separate_rows(states_name_en, convert = TRUE, sep = ",") %>%
   mutate(country = case_when(
     states_name_en == "Bolivia (Plurinational State of)"  ~ "Bolivia",
     states_name_en == "Cabo Verde"  ~ "Republic of Cabo Verde",
@@ -216,33 +217,33 @@ wh_unesco %>%
   ))
 
 wh_unesco_countries_count <-  
-  wh_unesco_countries %>% 
+  wh_unesco_countries %>%
   count(country)
 
-median_number_unesco_sites_per_country <- 
+median_number_unesco_sites_per_country <-
   median(wh_unesco_countries_count$n)
 
-mode_number_unesco_sites_per_country <- 
+mode_number_unesco_sites_per_country <-
   round(estimate_mode(wh_unesco_countries_count$n), 1)
 
-wh_unesco_country_counts_hist <- 
+wh_unesco_country_counts_hist <-
 ggplot(wh_unesco_countries_count,
        aes(n)) +
   geom_histogram() +
-  annotate("text", x = 30, y = 30, 
+  annotate("text", x = 30, y = 30,
            label = str_glue('Median =\n{median_number_unesco_sites_per_country} WH sites/country\nMode =\n{mode_number_unesco_sites_per_country} WH sites/country'),
            size = 3) +
   theme_nogrid(8)
 
-sf_map_data_unesco <- 
-world %>% 
+sf_map_data_unesco <-
+world %>%
   left_join(wh_unesco_countries_count,
-            by = c( 'name_long' = 'country')) %>% 
-  select(name, n, geometry) %>% 
-  mutate(n = ifelse(is.na(n), 0, n)) %>% 
+            by = c( 'name_long' = 'country')) %>%
+  select(name, n, geometry) %>%
+  mutate(n = ifelse(is.na(n), 0, n)) %>%
   filter(name != "Antartica")
 
-wh_country_unesco_count_map <- 
+wh_country_unesco_count_map <-
 ggplot(data = sf_map_data_unesco) +
     geom_sf(aes(fill = n), lwd = 0) +
     scale_fill_viridis_c(na.value="grey90") +
@@ -252,11 +253,11 @@ ggplot(data = sf_map_data_unesco) +
           subtitle = "from https://whc.unesco.org/en/syndication")
 
 wh_country_unesco_count_map +
-  annotation_custom(ggplotGrob(wh_unesco_country_counts_hist), 
-                    xmin = -190, 
-                    xmax = -90, 
-                    ymin= 10, 
-                    ymax=-70) 
+  annotation_custom(ggplotGrob(wh_unesco_country_counts_hist),
+                    xmin = -190,
+                    xmax = -90,
+                    ymin= 10,
+                    ymax=-70)
 
 ggsave("figures/wh_country_unesco_count_map.png")
 
@@ -266,10 +267,10 @@ What countries are most represented?
 
 ```{r}
   # get country of site from location text
-  # Laos, Czech Republic, Micronesia, Zimbabwe, South Sudan, Chad, 
+  # Laos, Czech Republic, Micronesia, Zimbabwe, South Sudan, Chad,
   # Central African Republic, Congo, Gabon, Cameroon, Nigeria, Bosnia and Herzegovina
-  #  Cote d'Ivoire, Sierra Leone, Guyana, Belize, 
-  country_names <-  paste(c(world$name, 
+  #  Cote d'Ivoire, Sierra Leone, Guyana, Belize,
+  country_names <-  paste(c(world$name,
                             "United States",
                             "Czech Republic",
                              "Antigua & Barbuda",
@@ -277,49 +278,49 @@ What countries are most represented?
                             ),
                           collapse="|")
 
-  page_data_for_all_pages_location <- 
-    page_data_for_all_pages %>% 
-    mutate(country = str_extract(Location, 
-                                 regex(country_names, 
-                                       ignore.case=TRUE))) %>% 
+  page_data_for_all_pages_location <-
+    page_data_for_all_pages %>%
+    mutate(country = str_extract(Location,
+                                 regex(country_names,
+                                       ignore.case=TRUE))) %>%
     mutate(country = case_when(
       country == "United States" ~ "United States of America",
       country == "Czech Republic" ~ "Czechia",
       country == "Antigua & Barbuda" ~ "Antigua and Barb.",
       country == "Saint Kitts and Nevis" ~ "St. Kitts and Nevis",
       TRUE ~ as.character(country)))
-  
-  
-wh_wiki_table_location <- 
-  wh_wiki_table %>% 
-  mutate(country = str_extract(Location, 
-                                 regex(country_names, 
-                                       ignore.case=TRUE))) %>% 
+
+
+wh_wiki_table_location <-
+  wh_wiki_table %>%
+  mutate(country = str_extract(Location,
+                                 regex(country_names,
+                                       ignore.case=TRUE))) %>%
     mutate(country = case_when(
       country == "United States" ~ "United States of America",
       country == "Czech Republic" ~ "Czechia",
       country == "Antigua & Barbuda" ~ "Antigua and Barb.",
       country == "Saint Kitts and Nevis" ~ "St. Kitts and Nevis",
       TRUE ~ as.character(country)))
-  
+
 ```
 
 ## More maps
 
 ```{r}
 
-wh_wk_country_counts <- 
-page_data_for_all_pages_location %>% 
-  count(country) %>% 
+wh_wk_country_counts <-
+page_data_for_all_pages_location %>%
+  count(country) %>%
   filter(!is.na(country))
 
 theme_nogrid <- function (base_size = 12, base_family = "") {
-  theme_bw(base_size = base_size, 
-           base_family = base_family) %+replace% 
+  theme_bw(base_size = base_size,
+           base_family = base_family) %+replace%
     theme(panel.grid = element_blank() )   
 }
 
-median_number_wp_pages_per_country <- 
+median_number_wp_pages_per_country <-
   median(wh_wk_country_counts$n)
 
 estimate_mode <- function(x) {
@@ -327,19 +328,19 @@ estimate_mode <- function(x) {
   d$x[which.max(d$y)]
 }
 
-mode_number_wp_pages_per_country <- 
+mode_number_wp_pages_per_country <-
   round(estimate_mode(wh_wk_country_counts$n), 1)
 
-wh_wk_country_counts_hist <- 
+wh_wk_country_counts_hist <-
 ggplot(wh_wk_country_counts,
        aes(n)) +
   geom_histogram() +
-  annotate("text", x = 15, y = 30, 
+  annotate("text", x = 15, y = 30,
            label = str_glue('Median = {median_number_wp_pages_per_country} WP pages/country\nMode = {mode_number_wp_pages_per_country} WP pages/country'),
            size = 2) +
   theme_nogrid(12)
 
-wh_wk_country_counts_bar <- 
+wh_wk_country_counts_bar <-
 ggplot(wh_wk_country_counts,
        aes(reorder(country, n),
            n)) +
@@ -352,33 +353,33 @@ ggplot(wh_wk_country_counts,
 ## Here's a map of countries showing which has the most WP pages for WH sites
 
 ```{r}
-sf_map_data <- 
-world %>% 
+sf_map_data <-
+world %>%
   left_join(wh_wk_country_counts,
-            by = c( 'name' = 'country')) %>% 
-  select(name, n, geometry) %>% 
-  mutate(n = ifelse(is.na(n), 0, n)) %>% 
+            by = c( 'name' = 'country')) %>%
+  select(name, n, geometry) %>%
+  mutate(n = ifelse(is.na(n), 0, n)) %>%
   filter(name != "Antartica")
 
-wh_wk_country_count_map <- 
+wh_wk_country_count_map <-
 ggplot(data = sf_map_data) +
     geom_sf(aes(fill = n), lwd = 0) +
     scale_fill_viridis_c(na.value="grey90") +
   coord_sf(ylim = c(-50, 90), datum = NA) +
   theme_minimal() +
   ggtitle("Cultural Sites on the UNESCO World Heritage list with Wikipedia pages",
-          subtitle = str_glue("The top five are {wh_wk_country_counts %>% 
-                                                  arrange(-n) %>% 
-                                                  slice(1:5) %>% 
+          subtitle = str_glue("The top five are {wh_wk_country_counts %>%
+                                                  arrange(-n) %>%
+                                                  slice(1:5) %>%
                                                   pull(country) %>%
                                                   str_flatten(collapse = ', ')}"))
 
 wh_wk_country_count_map +
-  annotation_custom(ggplotGrob(wh_wk_country_counts_hist), 
-                    xmin = -190, 
-                    xmax = -90, 
-                    ymin= 10, 
-                    ymax=-70) 
+  annotation_custom(ggplotGrob(wh_wk_country_counts_hist),
+                    xmin = -190,
+                    xmax = -90,
+                    ymin= 10,
+                    ymax=-70)
 
 ggsave("figures/wh_country_wikpedia_pages_count_map.png")
 ```
@@ -386,47 +387,47 @@ ggsave("figures/wh_country_wikpedia_pages_count_map.png")
 ## Map of the ratio of WH sites with WP pages, per country
 
 ```{r}
-wh_wiki_table_location_prop <- 
-wh_wiki_table_location %>% 
-  mutate(has_wp_page = ifelse(!is.na(site_page_name), 1, 0)) %>% 
-  group_by(country) %>% 
-  summarise(prop_sites_with_pages = sum(has_wp_page) / n()) %>% 
+wh_wiki_table_location_prop <-
+wh_wiki_table_location %>%
+  mutate(has_wp_page = ifelse(!is.na(site_page_name), 1, 0)) %>%
+  group_by(country) %>%
+  summarise(prop_sites_with_pages = sum(has_wp_page) / n()) %>%
   filter(!is.na(country))
 
-wh_wk_country_prop_hist <- 
+wh_wk_country_prop_hist <-
 ggplot(wh_wiki_table_location_prop,
        aes(prop_sites_with_pages)) +
   geom_histogram() +
   theme_nogrid(10)
 
-wh_wk_country_all_counts <- 
-wh_wiki_table_location %>% 
-  count(country) %>% 
-  filter(!is.na(country)) %>% 
+wh_wk_country_all_counts <-
+wh_wiki_table_location %>%
+  count(country) %>%
+  filter(!is.na(country)) %>%
   left_join(wh_wiki_table_location_prop)
 
-wh_wk_country_prop_scatter <- 
+wh_wk_country_prop_scatter <-
 ggplot(wh_wk_country_all_counts,
        aes(prop_sites_with_pages, n)) +
   geom_point(alpha = 0.5) +
   coord_fixed(0.02) +
   theme_nogrid(6)
 
-wh_wk_country_prop_scatter_marginal <- 
+wh_wk_country_prop_scatter_marginal <-
 ggExtra::ggMarginal(wh_wk_country_prop_scatter,
                     type = "histogram")
 
-sf_map_data_prop <- 
-world %>% 
-  filter(name != "Antartica") %>% 
+sf_map_data_prop <-
+world %>%
+  filter(name != "Antartica") %>%
   left_join(wh_wiki_table_location_prop,
-            by = c( 'name' = 'country')) %>% 
-  select(name, 
-         prop_sites_with_pages, 
-         geometry)  %>% 
+            by = c( 'name' = 'country')) %>%
+  select(name,
+         prop_sites_with_pages,
+         geometry)  %>%
   mutate(prop_sites_with_pages = ifelse(is.na(prop_sites_with_pages), 0, prop_sites_with_pages))
 
-wh_wk_country_prop_map <- 
+wh_wk_country_prop_map <-
 ggplot(data = sf_map_data_prop) +
     geom_sf(aes(fill = prop_sites_with_pages), lwd = 0) +
     scale_fill_viridis_c(na.value="grey90") +
@@ -435,11 +436,11 @@ ggplot(data = sf_map_data_prop) +
   ggtitle("Ratio of number of Cultural Sites on the UNESCO World Heritage list\nto the number of those sites with Wikipedia pages")
 
 wh_wk_country_prop_map +
-  annotation_custom((wh_wk_country_prop_scatter_marginal), 
-                    xmin = -190, 
-                    xmax = -90, 
-                    ymin= 10, 
-                    ymax=-70) 
+  annotation_custom((wh_wk_country_prop_scatter_marginal),
+                    xmin = -190,
+                    xmax = -90,
+                    ymin= 10,
+                    ymax=-70)
 
 ggsave("figures/wh_country_wikpedia_pages_ratio_map.png")
 ```
@@ -447,21 +448,21 @@ ggsave("figures/wh_country_wikpedia_pages_ratio_map.png")
 ## Basic qualities of the content of WP articles about WH sites
 
 ```{r}
-ten_k_random_wp_pages_basic_qualities <- 
-ten_k_random_wp_pages %>% 
+ten_k_random_wp_pages_basic_qualities <-
+ten_k_random_wp_pages %>%
   select(page_wordcount,
-         page_wikilinks_out, 
-         page_cited_items_on) %>% 
+         page_wikilinks_out,
+         page_cited_items_on) %>%
   mutate(rnd_page_wikilinks_out_per_1k_words = page_wikilinks_out / page_wordcount * 1000,
          rnd_page_cited_items_on_per_1k_words = page_cited_items_on / page_wordcount * 1000,
-         rnd_page_wordcount = page_wordcount) %>% 
+         rnd_page_wordcount = page_wordcount) %>%
   select(-page_wikilinks_out,
          -page_cited_items_on,
-         -page_wordcount) 
+         -page_wordcount)
 
-ten_k_random_wp_pages_basic_qualities_long <- 
-  ten_k_random_wp_pages_basic_qualities %>% 
-  gather(variable, value) 
+ten_k_random_wp_pages_basic_qualities_long <-
+  ten_k_random_wp_pages_basic_qualities %>%
+  gather(variable, value)
 ```
 
 
@@ -470,21 +471,21 @@ number of links out/word
 number of references/word: scholarly or not
 
 ```{r}
-page_data_for_all_pages_basic_qualities <- 
-page_data_for_all_pages %>% 
+page_data_for_all_pages_basic_qualities <-
+page_data_for_all_pages %>%
   select(page_wordcount,
-         page_wikilinks_out, 
-         page_cited_items_on) %>% 
+         page_wikilinks_out,
+         page_cited_items_on) %>%
   mutate(page_wikilinks_out_per_1k_words = page_wikilinks_out / page_wordcount * 1000,
-         page_cited_items_on_per_1k_words = page_cited_items_on / page_wordcount * 1000) %>% 
+         page_cited_items_on_per_1k_words = page_cited_items_on / page_wordcount * 1000) %>%
   select(-page_wikilinks_out,
          -page_cited_items_on)
 
-page_data_for_all_pages_basic_qualities_long <- 
-page_data_for_all_pages_basic_qualities %>% 
-  gather(variable, value) %>% 
-  bind_rows(ten_k_random_wp_pages_basic_qualities_long) %>% 
-  mutate(source = ifelse(str_detect(variable, "rnd" ), "10k Random pages", "World Heritage pages")) %>% 
+page_data_for_all_pages_basic_qualities_long <-
+page_data_for_all_pages_basic_qualities %>%
+  gather(variable, value) %>%
+  bind_rows(ten_k_random_wp_pages_basic_qualities_long) %>%
+  mutate(source = ifelse(str_detect(variable, "rnd" ), "10k Random pages", "World Heritage pages")) %>%
   mutate(variable = str_remove(variable, "rnd_"))
 
 label_names <- list(
@@ -504,12 +505,12 @@ labeller <- function(variable,value){
                alpha = 0.3) +
   scale_x_log10() +
   scale_fill_viridis_d() +
-  facet_wrap( ~ variable, 
+  facet_wrap( ~ variable,
               scales = "free",
               labeller = labeller) +
   theme_minimal() +
     ggtitle("Basic qualities about Wikipedia article content")
-  
+
   ggsave("figures/wh_wikpedia_pages_basic_content.png")
 ```
 
@@ -545,24 +546,24 @@ page_views_last_n_days_total
 
 ```{r}
 library(ggrepel)
-ten_k_random_wp_pages_attent <- 
-ten_k_random_wp_pages %>% 
-  select(page_wikilinks_in, 
-         page_views_last_n_days_total) 
+ten_k_random_wp_pages_attent <-
+ten_k_random_wp_pages %>%
+  select(page_wikilinks_in,
+         page_views_last_n_days_total)
 
-page_data_for_all_pages_attent <- 
-page_data_for_all_pages %>% 
-  select(page_wikilinks_in, 
-         page_views_last_n_days_total) 
+page_data_for_all_pages_attent <-
+page_data_for_all_pages %>%
+  select(page_wikilinks_in,
+         page_views_last_n_days_total)
 
-page_data_for_all_pages_attent_long <- 
-page_data_for_all_pages_attent %>% 
-  gather(variable, value) %>% 
-  bind_rows(ten_k_random_wp_pages_attent %>% 
-              gather(variable, value) %>% 
-              mutate(variable =  str_glue('rnd_{variable}'))) %>% 
-  mutate(source = ifelse(str_detect(variable, "rnd" ), "10k Random pages", 
-                         "World Heritage pages")) %>% 
+page_data_for_all_pages_attent_long <-
+page_data_for_all_pages_attent %>%
+  gather(variable, value) %>%
+  bind_rows(ten_k_random_wp_pages_attent %>%
+              gather(variable, value) %>%
+              mutate(variable =  str_glue('rnd_{variable}'))) %>%
+  mutate(source = ifelse(str_detect(variable, "rnd" ), "10k Random pages",
+                         "World Heritage pages")) %>%
   mutate(variable = str_remove(variable, "rnd_"))
 
 # density plots
@@ -582,24 +583,24 @@ labeller <- function(variable,value){
                alpha = 0.3) +
   scale_x_log10() +
   scale_fill_viridis_d() +
-  facet_wrap( ~ variable, 
+  facet_wrap( ~ variable,
               scales = "free",
               labeller = labeller) +
   theme_minimal() +
     ggtitle("Basic qualities about consumption of Wikipedia articles")
-  
+
 ggsave("figures/wh_wikpedia_pages_consumption.png")
 ```
 
-## Scatterplot showing the WP sites that get the most attention 
-  
+## Scatterplot showing the WP sites that get the most attention
+
 ```{r}
 library(ggrepel)
-page_data_for_all_pages %>% 
+page_data_for_all_pages %>%
   select( Site,
           page_wordcount,
-         page_wikilinks_in, 
-         page_views_last_n_days_total)  %>% 
+         page_wikilinks_in,
+         page_views_last_n_days_total)  %>%
   ggplot(aes(page_wikilinks_in,
              page_views_last_n_days_total,
              label = str_wrap(Site, 30))) +
@@ -617,10 +618,10 @@ page_data_for_all_pages %>%
   scale_y_log10(expand = c(1, 0.05)) +
   scale_x_log10(limits = c(1, 10000)) +
   coord_fixed(0.5) +
-  scale_color_viridis_c(name = "Wordcount", 
+  scale_color_viridis_c(name = "Wordcount",
                         labels = c(20000, 15000, 10000, 5000),
                         breaks = c(20000, 15000, 10000, 5000)) +
-  scale_size_continuous(name = "Wordcount", 
+  scale_size_continuous(name = "Wordcount",
                         labels = c(20000, 15000, 10000, 5000),
                         breaks = c(20000, 15000, 10000, 5000)) +
    guides(color= guide_legend(), size=guide_legend()) +
@@ -628,7 +629,7 @@ page_data_for_all_pages %>%
   labs(x = "Number of wikilinks to the page",
        y = "Total page views (last 100 days)") +
     ggtitle("Basic qualities about the consumption of Wikipedia articles")
-  
+
 ggsave("figures/wh_wikpedia_pages_consumption_scatterplot.png")
 ```
 
@@ -640,9 +641,9 @@ diversity of editors
 
 ```{r}
 # wh sites on wp
-revision_history_page_details <- 
-  tibble(revision_history_page_details = map(page_data_for_all_pages$page_info_t, 
-      ~.x$revision_history_page_details)) %>% 
+revision_history_page_details <-
+  tibble(revision_history_page_details = map(page_data_for_all_pages$page_info_t,
+      ~.x$revision_history_page_details)) %>%
   mutate(Site =         page_data_for_all_pages$Site,
          Country =      page_data_for_all_pages$country,
          rh_n_editors = map_int(revision_history_page_details, ~n_distinct(.x$rh_user)),
@@ -653,74 +654,74 @@ revision_history_page_details <-
 
 # random sites
 
-ten_k_random_wp_pages_revision_history_page_details <- 
-  map_df(ten_k_random_wp_pages_lst, 
-         ~.x$revision_history_page_details, 
+ten_k_random_wp_pages_revision_history_page_details <-
+  map_df(ten_k_random_wp_pages_lst,
+         ~.x$revision_history_page_details,
          .id = 'Site')
 
 # very slow!
-ten_k_random_wp_pages_revision_history_page_details_summary_tbl <- 
-  ten_k_random_wp_pages_revision_history_page_details %>% 
-  mutate(Site = as.numeric(Site)) %>% 
-  group_by(Site) %>% 
+ten_k_random_wp_pages_revision_history_page_details_summary_tbl <-
+  ten_k_random_wp_pages_revision_history_page_details %>%
+  mutate(Site = as.numeric(Site)) %>%
+  group_by(Site) %>%
   summarise(
          rh_n_editors = n_distinct(rh_user),
          rh_n_edits =   n(),
          rh_n_bot_edits = sum(bot),
-         rh_n_reverts = sum(revert)) %>% 
+         rh_n_reverts = sum(revert)) %>%
   mutate(rh_revert_prop = rh_n_reverts / rh_n_edits,
          rh_bot_edits_prop = rh_n_bot_edits / rh_n_edits)
-         
+
 # plot both samples, number of edits per page
-bind_rows(revision_history_page_details %>% 
-            select(Site, rh_n_edits) %>% 
+bind_rows(revision_history_page_details %>%
+            select(Site, rh_n_edits) %>%
             mutate(Site = "wh"),
-          ten_k_random_wp_pages_revision_history_page_details_summary_tbl %>% 
-            select(Site, rh_n_edits) %>% 
-            mutate(Site = "rand")) %>% 
+          ten_k_random_wp_pages_revision_history_page_details_summary_tbl %>%
+            select(Site, rh_n_edits) %>%
+            mutate(Site = "rand")) %>%
   ggplot(aes(rh_n_edits,
              fill = Site)) +
   geom_density(alpha = 0.3) +
   scale_x_log10() +
-  scale_fill_viridis_d(labels = c("Random", 
+  scale_fill_viridis_d(labels = c("Random",
                                "World Heritage")) +
   labs(x = "Number of edits per page",
        fill = "Wikipedia pages") +
-  theme_minimal() 
-  
+  theme_minimal()
+
 ggsave("figures/wh_wikpedia_edits_per_page.png")
 ```
 
 ## Edits per 1k words, as a measure of edit density
 
 ```{r}
-revision_history_page_details_wordcount <- 
-  revision_history_page_details %>% 
-  bind_cols(page_data_for_all_pages %>% select(page_wordcount)) %>% 
+revision_history_page_details_wordcount <-
+  revision_history_page_details %>%
+  bind_cols(page_data_for_all_pages %>% select(page_wordcount)) %>%
   mutate(edits_per_1k_words = rh_n_edits / (page_wordcount / 1000))
 
-ten_k_random_wp_pages_revision_history_page_details_summary_tbl_all_dets <- 
-bind_cols(ten_k_random_wp_pages, 
-          ten_k_random_wp_pages_revision_history_page_details_summary_tbl) %>% 
+ten_k_random_wp_pages_revision_history_page_details_summary_tbl_all_dets <-
+bind_cols(ten_k_random_wp_pages,
+          ten_k_random_wp_pages_revision_history_page_details_summary_tbl) %>%
   mutate(edits_per_1k_words = rh_n_edits / (page_wordcount / 1000))
 
-bind_rows(revision_history_page_details_wordcount %>% 
-            select(Site, edits_per_1k_words) %>% 
+bind_rows(revision_history_page_details_wordcount %>%
+            select(Site, edits_per_1k_words) %>%
             mutate(Site = "wh"),
-          ten_k_random_wp_pages_revision_history_page_details_summary_tbl_all_dets %>% 
-            select(Site, edits_per_1k_words) %>% 
-            mutate(Site = "rand")) %>% 
+          ten_k_random_wp_pages_revision_history_page_details_summary_tbl_all_dets %>%
+            select(Site, edits_per_1k_words) %>%
+            mutate(Site = "rand")) %>%
   ggplot(aes(edits_per_1k_words,
              fill = Site)) +
   geom_density(alpha = 0.3) +
   #xlim(0, 100) +
   scale_x_log10() +
-  scale_fill_viridis_d(labels = c("Random", 
+  scale_fill_viridis_d(labels = c("Random",
                                "World Heritage")) +
   labs(x = "Number of edits per 1k words per page",
        fill = "Wikipedia pages") +
-  theme_minimal() 
-  
+  theme_minimal()
+
 ggsave("figures/wh_wikpedia_edits_density_page.png")
 ```
 
@@ -728,62 +729,62 @@ ggsave("figures/wh_wikpedia_edits_density_page.png")
 
 ```{r}
 # plot both samples, number of edits per page
-bind_rows(revision_history_page_details %>% 
-            select(Site, rh_n_editors) %>% 
+bind_rows(revision_history_page_details %>%
+            select(Site, rh_n_editors) %>%
             mutate(Site = "wh"),
-          ten_k_random_wp_pages_revision_history_page_details_summary_tbl %>% 
-            select(Site, rh_n_editors) %>% 
-            mutate(Site = "rand")) %>% 
+          ten_k_random_wp_pages_revision_history_page_details_summary_tbl %>%
+            select(Site, rh_n_editors) %>%
+            mutate(Site = "rand")) %>%
   ggplot(aes(rh_n_editors,
              fill = Site)) +
   geom_density(alpha = 0.3) +
   scale_x_log10(labels = scales::comma_format(accuracy = 1)) +
-  scale_fill_viridis_d(labels = c("Random", 
+  scale_fill_viridis_d(labels = c("Random",
                                "World Heritage")) +
   labs(x = "Number of editors per page",
        fill = "Wikipedia pages") +
-  theme_minimal() 
-  
+  theme_minimal()
+
 ggsave("figures/wh_wikpedia_editors_per_page.png")
 ```
 
 ## Number of unique editors per 1k words per page
 
 ```{r}
-revision_history_page_details_wordcount <- 
-  revision_history_page_details %>% 
-  bind_cols(page_data_for_all_pages %>% select(page_wordcount)) %>% 
+revision_history_page_details_wordcount <-
+  revision_history_page_details %>%
+  bind_cols(page_data_for_all_pages %>% select(page_wordcount)) %>%
   mutate(editors_per_1k_words = rh_n_editors / (page_wordcount / 1000))
 
-ten_k_random_wp_pages_revision_history_page_details_summary_tbl_all_dets <- 
-bind_cols(ten_k_random_wp_pages, 
-          ten_k_random_wp_pages_revision_history_page_details_summary_tbl) %>% 
+ten_k_random_wp_pages_revision_history_page_details_summary_tbl_all_dets <-
+bind_cols(ten_k_random_wp_pages,
+          ten_k_random_wp_pages_revision_history_page_details_summary_tbl) %>%
   mutate(editors_per_1k_words = rh_n_editors / (page_wordcount / 1000))
 
-bind_rows(revision_history_page_details_wordcount %>% 
-            select(Site, editors_per_1k_words) %>% 
+bind_rows(revision_history_page_details_wordcount %>%
+            select(Site, editors_per_1k_words) %>%
             mutate(Site = "wh"),
-          ten_k_random_wp_pages_revision_history_page_details_summary_tbl_all_dets %>% 
-            select(Site, editors_per_1k_words) %>% 
-            mutate(Site = "rand")) %>% 
+          ten_k_random_wp_pages_revision_history_page_details_summary_tbl_all_dets %>%
+            select(Site, editors_per_1k_words) %>%
+            mutate(Site = "rand")) %>%
   ggplot(aes(editors_per_1k_words,
              fill = Site)) +
   geom_density(alpha = 0.3) +
   scale_x_log10(labels = scales::comma_format(accuracy = 1)) +
-  scale_fill_viridis_d(labels = c("Random", 
+  scale_fill_viridis_d(labels = c("Random",
                                "World Heritage")) +
   labs(x = "Number of editors per 1k words per page",
        fill = "Wikipedia pages") +
-  theme_minimal() 
-  
+  theme_minimal()
+
 ggsave("figures/wh_wikpedia_editors_density_page.png")
 ```
 
 ## Size of edits, absolute and raw
 
 ```{r}
-page_data_for_all_pages_rh_tbl <- 
-map_df(page_data_for_all_pages$page_info_t, 
+page_data_for_all_pages_rh_tbl <-
+map_df(page_data_for_all_pages$page_info_t,
       ~.x$revision_history_page_details, .id = "Site")
 
 label_names <- list(
@@ -795,30 +796,30 @@ labeller <- function(variable,value){
   return(label_names[value])
 }
 
-bind_rows(page_data_for_all_pages_rh_tbl %>% 
-            select(Site, rh_diff_size) %>% 
-            group_by(Site) %>% 
+bind_rows(page_data_for_all_pages_rh_tbl %>%
+            select(Site, rh_diff_size) %>%
+            group_by(Site) %>%
             summarise(mean_diff = mean((rh_diff_size)),
-                      mean_abs_diff = mean(abs(rh_diff_size))) %>% 
+                      mean_abs_diff = mean(abs(rh_diff_size))) %>%
             mutate(Site = "wh"),
-          ten_k_random_wp_pages_revision_history_page_details %>% 
-            select(Site, rh_diff_size) %>% 
-              group_by(Site) %>% 
+          ten_k_random_wp_pages_revision_history_page_details %>%
+            select(Site, rh_diff_size) %>%
+              group_by(Site) %>%
             summarise(mean_diff = mean((rh_diff_size)),
-                      mean_abs_diff = mean(abs(rh_diff_size))) %>% 
-            mutate(Site = "rand")) %>% 
-  gather(variable, value, -Site) %>% 
+                      mean_abs_diff = mean(abs(rh_diff_size))) %>%
+            mutate(Site = "rand")) %>%
+  gather(variable, value, -Site) %>%
   ggplot(aes(value,
              fill = Site)) +
   geom_density(alpha = 0.3) +
   #xlim(0, 100) +
   scale_x_log10() +
-  scale_fill_viridis_d(labels = c("Random", 
+  scale_fill_viridis_d(labels = c("Random",
                                "World Heritage")) +
   labs(x = "Average size of edits per article (bytes)",
        fill = "Wikipedia pages") +
   facet_wrap( ~ variable, labeller = labeller) +
-  theme_minimal() 
+  theme_minimal()
 
 ggsave("figures/wh_wikpedia_edit_sizes.png")
 ```
@@ -827,32 +828,32 @@ ggsave("figures/wh_wikpedia_edit_sizes.png")
 
 ```{r}
 bind_rows(
-  
-page_data_for_all_pages_rh_tbl %>% 
-  group_by(Site) %>% 
+
+page_data_for_all_pages_rh_tbl %>%
+  group_by(Site) %>%
   summarise( n_bot_edits = sum(bot),
-             n_edits = n()) %>% 
+             n_edits = n()) %>%
   mutate(prop_bot_edits = n_bot_edits / n_edits,
            Site = "wh"),
 
 ten_k_random_wp_pages_revision_history_page_details %>%  
-  group_by(Site) %>% 
+  group_by(Site) %>%
 summarise( n_bot_edits = sum(bot),
-           n_edits = n()) %>% 
+           n_edits = n()) %>%
   mutate(prop_bot_edits = n_bot_edits / n_edits,
          Site = "rand")
-) %>% 
-  
+) %>%
+
   ggplot(aes(prop_bot_edits,
              fill = Site)) +
   geom_density(alpha = 0.3) +
   #xlim(0, 100) +
   scale_x_log10() +
-  scale_fill_viridis_d(labels = c("Random", 
+  scale_fill_viridis_d(labels = c("Random",
                                "World Heritage")) +
   labs(x = "Proportion of edits made by bots per article",
        fill = "Wikipedia pages") +
-  theme_minimal() 
+  theme_minimal()
 
 ggsave("figures/wh_wikpedia_edits_by_bots.png")
 ```
@@ -862,16 +863,16 @@ ggsave("figures/wh_wikpedia_edits_by_bots.png")
 ```{r}
 library(ggrepel)
 
-wh_bots <- 
- tibble(revision_history_page_details = map(page_data_for_all_pages$page_info_t, 
-      ~.x$revision_history_page_details))  %>% 
-  mutate(Site = page_data_for_all_pages$Site) %>% 
+wh_bots <-
+ tibble(revision_history_page_details = map(page_data_for_all_pages$page_info_t,
+      ~.x$revision_history_page_details))  %>%
+  mutate(Site = page_data_for_all_pages$Site) %>%
   mutate(n_bot_edits = map_dbl(revision_history_page_details, ~sum(.x$bot)),
-         n_edits = map_int(revision_history_page_details, ~nrow(.))) %>% 
-  mutate(prop_bot_edits = n_bot_edits / n_edits) %>% 
-  arrange(desc(prop_bot_edits)) 
-  
-  ggplot(wh_bots, 
+         n_edits = map_int(revision_history_page_details, ~nrow(.))) %>%
+  mutate(prop_bot_edits = n_bot_edits / n_edits) %>%
+  arrange(desc(prop_bot_edits))
+
+  ggplot(wh_bots,
          aes(n_bot_edits,
              n_edits,
              label = str_wrap(Site, 30))) +
@@ -889,10 +890,10 @@ wh_bots <-
   scale_y_log10() +
   scale_x_log10() +
   coord_fixed(0.5) +
-  scale_color_viridis_c(name = "Proportion of\nedits by bots", 
+  scale_color_viridis_c(name = "Proportion of\nedits by bots",
                         labels = c(0, 0.1, 0.2, 0.3, 0.4),
                         breaks = c(0, 0.1, 0.2, 0.3, 0.4)) +
-  scale_size_continuous(name = "Proportion of\nedits by bots", 
+  scale_size_continuous(name = "Proportion of\nedits by bots",
                         labels = c(0, 0.1, 0.2, 0.3, 0.4),
                         breaks = c(0, 0.1, 0.2, 0.3, 0.4)) +
    guides(color= guide_legend(), size=guide_legend()) +
@@ -900,7 +901,7 @@ wh_bots <-
   labs(x = "Number of edits by bots",
        y = "Total number of edits") +
     ggtitle("Bot activity on Wikipedia articles")
-  
+
 ggsave("figures/wh_wikpedia_pages_bot_edits_scatterplot.png")
 ```
 
@@ -911,20 +912,20 @@ ClueBot NG: vandalism
 
 ```{r}
 bind_rows(
-page_data_for_all_pages_rh_tbl %>% 
-  filter(bot == 1) %>% 
-  group_by(rh_user) %>% 
-  tally(sort = TRUE) %>% 
-  slice(1:10) %>% 
+page_data_for_all_pages_rh_tbl %>%
+  filter(bot == 1) %>%
+  group_by(rh_user) %>%
+  tally(sort = TRUE) %>%
+  slice(1:10) %>%
   mutate( Site = "World Heritage Sites"),
 
-ten_k_random_wp_pages_revision_history_page_details %>% 
-  filter(bot == 1) %>% 
-  group_by(rh_user) %>% 
-  tally(sort = TRUE) %>% 
-    slice(1:10) %>% 
-   mutate( Site = "Random pages")) %>% 
-  
+ten_k_random_wp_pages_revision_history_page_details %>%
+  filter(bot == 1) %>%
+  group_by(rh_user) %>%
+  tally(sort = TRUE) %>%
+    slice(1:10) %>%
+   mutate( Site = "Random pages")) %>%
+
   ggplot(aes(reorder(rh_user, n),
              n)) +
   geom_col() +
@@ -932,7 +933,7 @@ ten_k_random_wp_pages_revision_history_page_details %>%
   coord_flip() +
   facet_wrap( ~ Site, scales = "free") +
   xlab("")
-  
+
 ggsave("figures/wh_wikpedia_what_bots.png")
 ```
 
@@ -940,32 +941,32 @@ ggsave("figures/wh_wikpedia_what_bots.png")
 
 ```{r}
 bind_rows(
-page_data_for_all_pages_rh_tbl %>% 
+page_data_for_all_pages_rh_tbl %>%
   mutate(vandalism = ifelse(str_detect(rh_comment, "vandal"), 1, 0)) %>%
-  group_by(Site) %>% 
+  group_by(Site) %>%
   summarise( n_vandal_edits = sum(vandalism),
-             n_edits = n()) %>% 
+             n_edits = n()) %>%
   mutate(prop_vandal_edits = n_vandal_edits / n_edits,
            Site = "World Heritage Sites"),
 
-ten_k_random_wp_pages_revision_history_page_details %>% 
+ten_k_random_wp_pages_revision_history_page_details %>%
   mutate(vandalism = ifelse(str_detect(rh_comment, "vandal"), 1, 0)) %>%
-  group_by(Site) %>% 
+  group_by(Site) %>%
   summarise( n_vandal_edits = sum(vandalism),
-             n_edits = n()) %>% 
-  mutate(prop_vandal_edits = n_vandal_edits / n_edits, 
+             n_edits = n()) %>%
+  mutate(prop_vandal_edits = n_vandal_edits / n_edits,
          Site = "Random pages")
-) %>% 
-  
+) %>%
+
    ggplot(aes(prop_vandal_edits,
              fill = Site)) +
   geom_density(alpha = 0.3) +
   scale_x_log10() +
-  scale_fill_viridis_d(labels = c("Random", 
+  scale_fill_viridis_d(labels = c("Random",
                                "World Heritage")) +
   labs(x = "Proportion of edits relating to vandalism per article",
        fill = "Wikipedia pages") +
-  theme_minimal() 
+  theme_minimal()
 
 ggsave("figures/wh_wikpedia_vandalism_edits.png")
 
@@ -975,17 +976,17 @@ ggsave("figures/wh_wikpedia_vandalism_edits.png")
 
 ```{r}
 
-vandal_edits <- 
- tibble(revision_history_page_details = map(page_data_for_all_pages$page_info_t, 
-      ~.x$revision_history_page_details))  %>% 
-  mutate(Site = page_data_for_all_pages$Site) %>% 
-  mutate(n_vandal_edits = map_dbl(revision_history_page_details, 
+vandal_edits <-
+ tibble(revision_history_page_details = map(page_data_for_all_pages$page_info_t,
+      ~.x$revision_history_page_details))  %>%
+  mutate(Site = page_data_for_all_pages$Site) %>%
+  mutate(n_vandal_edits = map_dbl(revision_history_page_details,
                                   ~sum(ifelse(str_detect(.x$rh_comment, "vandalism"), 1, 0))),
-         n_edits = map_int(revision_history_page_details, ~nrow(.))) %>% 
-  mutate(prop_vandal_edits = n_vandal_edits / n_edits) %>% 
-  arrange(desc(prop_vandal_edits)) 
-  
-ggplot(vandal_edits, 
+         n_edits = map_int(revision_history_page_details, ~nrow(.))) %>%
+  mutate(prop_vandal_edits = n_vandal_edits / n_edits) %>%
+  arrange(desc(prop_vandal_edits))
+
+ggplot(vandal_edits,
          aes(n_vandal_edits,
              n_edits,
              label = str_wrap(Site, 30))) +
@@ -1003,10 +1004,10 @@ ggplot(vandal_edits,
   scale_y_log10() +
   scale_x_log10() +
   coord_fixed(0.5) +
-  scale_color_viridis_c(name = "Proportion of\nedits about vandalism", 
+  scale_color_viridis_c(name = "Proportion of\nedits about vandalism",
                         labels = c(0, 0.025, 0.05, 0.075),
                         breaks = c(0, 0.025, 0.05, 0.075)) +
-  scale_size_continuous(name = "Proportion of\nedits about vandalism", 
+  scale_size_continuous(name = "Proportion of\nedits about vandalism",
                         labels = c(0, 0.025, 0.05, 0.075),
                         breaks = c(0, 0.025, 0.05, 0.075)) +
    guides(color= guide_legend(), size=guide_legend()) +
@@ -1014,7 +1015,7 @@ ggplot(vandal_edits,
   labs(x = "Number of edits about vandalism",
        y = "Total number of edits") +
     ggtitle("Editing about vandalism on Wikipedia articles")
-  
+
 ggsave("figures/wh_wikpedia_pages_vandal_edits_scatterplot.png")
 
 ```
@@ -1024,32 +1025,32 @@ ggsave("figures/wh_wikpedia_pages_vandal_edits_scatterplot.png")
 ```{r}
 
 bind_rows(
-page_data_for_all_pages_rh_tbl %>% 
+page_data_for_all_pages_rh_tbl %>%
   mutate(revert = ifelse(revert, 1, 0)) %>%
-  group_by(Site) %>% 
+  group_by(Site) %>%
   summarise( n_revert_edits = sum(revert),
-             n_edits = n()) %>% 
+             n_edits = n()) %>%
   mutate(prop_revert_edits = n_revert_edits / n_edits,
            Site = "World Heritage Sites"),
 
-ten_k_random_wp_pages_revision_history_page_details %>% 
+ten_k_random_wp_pages_revision_history_page_details %>%
   mutate(revert = ifelse(revert, 1, 0)) %>%
-  group_by(Site) %>% 
+  group_by(Site) %>%
   summarise( n_revert_edits = sum(revert),
-             n_edits = n()) %>% 
-  mutate(prop_revert_edits = n_revert_edits / n_edits, 
+             n_edits = n()) %>%
+  mutate(prop_revert_edits = n_revert_edits / n_edits,
          Site = "Random pages")
-) %>% 
-  
+) %>%
+
    ggplot(aes(prop_revert_edits,
              fill = Site)) +
   geom_density(alpha = 0.3) +
   scale_x_log10() +
-  scale_fill_viridis_d(labels = c("Random", 
+  scale_fill_viridis_d(labels = c("Random",
                                "World Heritage")) +
   labs(x = "Proportion of reverting edits per article",
        fill = "Wikipedia pages") +
-  theme_minimal() 
+  theme_minimal()
 
 ggsave("figures/wh_wikpedia_pages_revert_edits.png")
 
@@ -1059,8 +1060,8 @@ ggsave("figures/wh_wikpedia_pages_revert_edits.png")
 
 ```{r}
 
-  
-ggplot(revision_history_page_details, 
+
+ggplot(revision_history_page_details,
          aes(rh_user_bot_prop,
              rh_n_edits,
              label = str_wrap(Site, 15))) +
@@ -1078,10 +1079,10 @@ ggplot(revision_history_page_details,
   scale_y_log10() +
   scale_x_log10() +
   coord_fixed(0.5) +
-  scale_color_viridis_c(name = "Proportion of\n edits reverted", 
+  scale_color_viridis_c(name = "Proportion of\n edits reverted",
                         labels = c(0, 0.04, 0.08, 0.12, 0.16),
                         breaks = c(0, 0.04, 0.08, 0.12, 0.16)) +
-  scale_size_continuous(name = "Proportion of\n edits reverted", 
+  scale_size_continuous(name = "Proportion of\n edits reverted",
                         labels = c(0, 0.04, 0.08, 0.12, 0.16),
                         breaks = c(0, 0.04, 0.08, 0.12, 0.16)) +
    guides(color= guide_legend(), size=guide_legend()) +
@@ -1089,45 +1090,45 @@ ggplot(revision_history_page_details,
   labs(x = "Proportion of bots",
        y = "Total number of edits") +
     ggtitle("Reverted edits on Wikipedia articles")
-  
+
 ggsave("figures/wh_wikpedia_pages_reverts_edits_scatterplot.png")
 ```
 
 ## Is there a correlation between reverts and vandalism?
 
 ```{r}
-left_join(page_data_for_all_pages, vandal_edits) %>% 
-  ggplot(aes(rh_revert_prop, 
+left_join(page_data_for_all_pages, vandal_edits) %>%
+  ggplot(aes(rh_revert_prop,
              prop_vandal_edits,
              size = n_edits)) +
   geom_point() +
   theme_minimal(base_size = 12) +
   labs(x = "Proportion of edits reverted",
        y = "Proportion of edits responding to vandalism") +
-    coord_fixed(1) 
+    coord_fixed(1)
 
 ggsave("figures/wh_wikpedia_pages_reverts_vandal_edits_scatterplot.png")
 
 ```
 
-## What's the typical distribution of talk page length? 
+## What's the typical distribution of talk page length?
 
 ```{r}
 bind_rows(
-  
-ten_k_random_wp_pages %>% 
-  select(talk_page_wordcount) %>% 
+
+ten_k_random_wp_pages %>%
+  select(talk_page_wordcount) %>%
   mutate(Site = "Random pages"),
 
-page_data_for_all_pages %>% 
-  select(talk_page_wordcount) %>% 
+page_data_for_all_pages %>%
+  select(talk_page_wordcount) %>%
   mutate(Site = "World Heritage pages")
-) %>% 
+) %>%
 
-  ggplot(aes(talk_page_wordcount, 
+  ggplot(aes(talk_page_wordcount,
              fill = Site)) +
   geom_density(alpha = 0.3) +
-   scale_fill_viridis_d(labels = c("Random", 
+   scale_fill_viridis_d(labels = c("Random",
                                "World Heritage")) +
   labs(x = "Talk page word count",
        fill = "Wikipedia pages") +
@@ -1141,9 +1142,9 @@ ggsave("figures/wh_wikpedia_pages_talk_page_worcount.png")
 
 ```{r}
 
-wh_pages_talk_page_length <- 
+wh_pages_talk_page_length <-
 left_join(page_data_for_all_pages,
-          revision_history_page_details_wordcount) 
+          revision_history_page_details_wordcount)
 
 ggplot(wh_pages_talk_page_length,
          aes(rh_n_edits,
@@ -1164,10 +1165,10 @@ ggplot(wh_pages_talk_page_length,
   scale_y_log10() +
   scale_x_log10(labels = scales::comma_format(accuracy = 1)) +
   coord_fixed(1) +
-  scale_color_viridis_c(name = "Talk page word count", 
+  scale_color_viridis_c(name = "Talk page word count",
                         labels = c(5000, 10000, 15000, 20000),
                         breaks = c(5000, 10000, 15000, 20000)) +
-  scale_size_continuous(name = "Talk page word count", 
+  scale_size_continuous(name = "Talk page word count",
                         labels = c(5000, 10000, 15000, 20000),
                         breaks = c(5000, 10000, 15000, 20000)) +
    guides(color= guide_legend(), size=guide_legend()) +
@@ -1180,51 +1181,51 @@ ggsave("figures/wh_wikpedia_pages_talk_page_wordcount_reverts_scatterplot.png")
 
 ```
 
-## Talk page topic modelling 
+## Talk page topic modelling
 
 ```{r}
 library(tidytext)
 
-tidy_talk_raw <- 
-enframe(unlist(wh_wiki_talk_pages)) %>% 
+tidy_talk_raw <-
+enframe(unlist(wh_wiki_talk_pages)) %>%
   bind_cols(wh_wiki_table)
 
 write.csv(tidy_talk_raw$value , "data/wh_wiki_talk_page_text.txt")
 
-tidy_talk <- 
-  tidy_talk_raw %>% 
-    mutate(clean_text = str_remove_all(value, "\n|\t")) %>% 
-  unnest_tokens(word, clean_text) %>% 
-  anti_join(stop_words) %>% 
-  filter(!word %in% c("article", "page", "talk", "utc", 
+tidy_talk <-
+  tidy_talk_raw %>%
+    mutate(clean_text = str_remove_all(value, "\n|\t")) %>%
+  unnest_tokens(word, clean_text) %>%
+  anti_join(stop_words) %>%
+  filter(!word %in% c("article", "page", "talk", "utc",
                       "class", "edit", "project's",
                       "importance", "rated", "wikiproject",
                       "project", "article", "articles", "article's",
-                      "wikipedia", "start", "scale", 
+                      "wikipedia", "start", "scale",
                       "world", "heritage", "sites",
-                      "links", "http", "parser", 
+                      "links", "http", "parser",
                       "output", "mw", "https",
-                      "unsigned", "comment")) %>% 
-  filter(!str_detect(word, "[[:digit:]]+")) %>% 
-  filter(!str_detect(word, ":")) %>% 
-  filter(!str_detect(word, "articles")) %>% 
-  filter(!str_detect(word, "jump")) %>% 
+                      "unsigned", "comment")) %>%
+  filter(!str_detect(word, "[[:digit:]]+")) %>%
+  filter(!str_detect(word, ":")) %>%
+  filter(!str_detect(word, "articles")) %>%
+  filter(!str_detect(word, "jump")) %>%
   filter(!str_detect(word, "\\."))
 
 # check which sites have some words
-tidy_talk %>% 
-  filter(word == "unesco") %>% 
-  group_by(Site) %>% 
+tidy_talk %>%
+  filter(word == "unesco") %>%
+  group_by(Site) %>%
   tally(sort = T)
 
-  
+
 # top words
-tidy_talk %>% 
+tidy_talk %>%
   count(word, sort = TRUE)
 
 # biggest documents
-tidy_talk %>% 
-  group_by(name) %>% 
+tidy_talk %>%
+  group_by(name) %>%
   tally(sort = TRUE)
 ```
 
@@ -1242,17 +1243,17 @@ talk_dfm <- tidy_talk %>%
 # talk_dfm_stm <- convert(talk_dfm, to = "stm")
 
 # very time consuming
-# k_search_output <- 
-# searchK(talk_dfm_stm$documents, 
+# k_search_output <-
+# searchK(talk_dfm_stm$documents,
 #         talk_dfm_stm$vocab,
 #         K = seq(10, 100, 20),
 #         cores = 1)
-# 
+#
 # plot(k_search_output)
 
 # takes a few minutes
-topic_model <- stm(talk_dfm, K = 60, 
-                   verbose = FALSE, 
+topic_model <- stm(talk_dfm, K = 60,
+                   verbose = FALSE,
                    init.type = "Spectral")
 
 png(filename = "figures/wh_talk_pages_top_topics.png", width = 1800, height = 2600, res = 300)
@@ -1295,7 +1296,7 @@ ggplot(td_gamma, aes(gamma, fill = as.factor(topic))) +
   facet_wrap(~ topic, ncol = 3) +
   labs(title = "Distribution of document probabilities for each topic",
        y = "Number of stories", x = expression(gamma)) +
-      theme_minimal(base_size = 6) 
+      theme_minimal(base_size = 6)
 
 ```
 
@@ -1305,7 +1306,7 @@ ggplot(td_gamma, aes(gamma, fill = as.factor(topic))) +
 topic_model_gamma <- tidy(topic_model, matrix = "gamma")
 
 topic_model_gamma %>%
-  filter(document %in% 1:10) %>% 
+  filter(document %in% 1:10) %>%
   mutate(title = reorder(document, gamma * topic)) %>%
   ggplot(aes(factor(topic), gamma)) +
   geom_boxplot() +
@@ -1329,16 +1330,16 @@ g <- graph.adjacency(mod.out.corr$posadj)
 V(g)$Degree <- degree(g, mode = 'in') # CALCULATE DEGREE
 V(g)$Name <- topic_tag # ADD NAMES
 E(g)$weight <- edge.betweenness(g)
-  
+
 library(ggraph)
 
-ggraph(g, layout = "lgl") + 
+ggraph(g, layout = "lgl") +
   geom_edge_link0(aes(width = weight), alpha = 0.1) +
   geom_edge_diagonal(label_colour = "blue", alpha = 0.1) +
-    geom_node_point(aes(size = Degree), alpha = 0.6, colour = "steelblue") + 
+    geom_node_point(aes(size = Degree), alpha = 0.6, colour = "steelblue") +
     geom_node_text(aes(label = Name), size = 3) +
     theme_graph(foreground = 'steelblue', fg_text_colour = 'white')
-  
+
 ggsave("figures/wh_talk_page_topic_correlation_network.png")
 ```
 
@@ -1352,7 +1353,7 @@ ip_regex <- "(?(?=.*?(\\d+\\.\\d+\\.\\d+\\.\\d+).*?)(\\1|))"
 
 get_ip_addresses <- function(x){
   re <- regexpr(
-  ip_regex, 
+  ip_regex,
   x, perl = TRUE)
 regmatches(x, re)
 }
@@ -1370,39 +1371,39 @@ Get locations for random pages.
 ## How many IP edits on each page?
 
 ```{r}
-randoms_revision_history_page_details <- 
-  map_df(ten_k_random_wp_pages_lst, 
-         ~.x$revision_history_page_details, 
-         .id = "page") 
+randoms_revision_history_page_details <-
+  map_df(ten_k_random_wp_pages_lst,
+         ~.x$revision_history_page_details,
+         .id = "page")
 
-randoms_revision_history_page_details_ip <- 
-randoms_revision_history_page_details %>% 
+randoms_revision_history_page_details_ip <-
+randoms_revision_history_page_details %>%
     mutate(is_ip_address = ifelse(get_ip_addresses(rh_user) != "", TRUE, FALSE),
-         page = as.numeric(page)) 
-  
-randoms_revision_history_page_details_ip_prop <- 
-  randoms_revision_history_page_details_ip %>% 
-  group_by(page) %>% 
+         page = as.numeric(page))
+
+randoms_revision_history_page_details_ip_prop <-
+  randoms_revision_history_page_details_ip %>%
+  group_by(page) %>%
   summarise(prop_ip_addresses = sum(is_ip_address) / n() )
 
-both_ip_props <- 
+both_ip_props <-
 bind_rows(
-revision_history_page_details_ip_addresses_countries %>% 
-  ungroup %>% 
-  select(prop_anon_of_all_edits) %>% 
-  mutate(source = "World Heritage Sites", 
+revision_history_page_details_ip_addresses_countries %>%
+  ungroup %>%
+  select(prop_anon_of_all_edits) %>%
+  mutate(source = "World Heritage Sites",
          prop_ip_addresses = prop_anon_of_all_edits),
 
-randoms_revision_history_page_details_ip_prop %>% 
-    ungroup %>% 
-  select(prop_ip_addresses) %>% 
-    mutate(source = "Random pages")) 
+randoms_revision_history_page_details_ip_prop %>%
+    ungroup %>%
+  select(prop_ip_addresses) %>%
+    mutate(source = "Random pages"))
 
 ggplot(both_ip_props,
-       aes(fill = source, 
+       aes(fill = source,
            prop_ip_addresses)) +
   geom_density(alpha = 0.3) +
-   scale_fill_viridis_d(labels = c("Random", 
+   scale_fill_viridis_d(labels = c("Random",
                                "World Heritage")) +
   theme_minimal() +
   xlab("Proportion of all edits that are anonymous")
@@ -1413,19 +1414,19 @@ ggsave("figures/proportion_of_IP_edits.png")
 ## Overall location of IP edits for all random pages
 
 ```{r}
-randoms_revision_history_page_details_ip_location <- 
-randoms_revision_history_page_details_ip %>% 
-  filter(is_ip_address) %>% 
-  mutate(ip_location = map(rh_user, ~maxmind(.x, ip_db)))  %>% 
+randoms_revision_history_page_details_ip_location <-
+randoms_revision_history_page_details_ip %>%
+  filter(is_ip_address) %>%
+  mutate(ip_location = map(rh_user, ~maxmind(.x, ip_db)))  %>%
   unnest(ip_location)
 
-randoms_revision_history_page_details_ip_location_tally <- 
-randoms_revision_history_page_details_ip_location %>% 
-  filter(!is.na(country_name)) %>% 
-  mutate(country_name = fct_rev(fct_infreq(country_name))) %>% 
-  group_by(country_name) %>% 
-  tally(sort = TRUE) %>% 
-  filter(n > 100) 
+randoms_revision_history_page_details_ip_location_tally <-
+randoms_revision_history_page_details_ip_location %>%
+  filter(!is.na(country_name)) %>%
+  mutate(country_name = fct_rev(fct_infreq(country_name))) %>%
+  group_by(country_name) %>%
+  tally(sort = TRUE) %>%
+  filter(n > 100)
 
 ggplot(randoms_revision_history_page_details_ip_location_tally,
        aes(country_name, n)) +
@@ -1438,64 +1439,64 @@ ggplot(randoms_revision_history_page_details_ip_location_tally,
 ## What's the geographic diversity of edits per random page?
 
 ```{r}
-randoms_revision_history_page_details_ip_location_props_per_page <- 
-randoms_revision_history_page_details_ip_location %>% 
-  filter(!is.na(country_name)) %>% 
-  mutate(country_name = fct_rev(fct_infreq(country_name))) %>% 
-  group_by(page, country_name) %>% 
-  tally() %>% 
-  mutate(prop = n / sum(n)) %>% 
+randoms_revision_history_page_details_ip_location_props_per_page <-
+randoms_revision_history_page_details_ip_location %>%
+  filter(!is.na(country_name)) %>%
+  mutate(country_name = fct_rev(fct_infreq(country_name))) %>%
+  group_by(page, country_name) %>%
+  tally() %>%
+  mutate(prop = n / sum(n)) %>%
   filter(country_name %in% randoms_revision_history_page_details_ip_location_tally$country_name)
 
 ggplot(randoms_revision_history_page_details_ip_location_props_per_page,
-       aes(country_name, 
+       aes(country_name,
            prop)) +
   geom_boxplot() +
   coord_flip()
 
-randoms_revision_history_page_details_ip_location_props_per_page_div <- 
-  randoms_revision_history_page_details_ip_location_props_per_page %>% 
-  group_by(page) %>% 
-  summarise(shannon = vegan::diversity(n)) 
+randoms_revision_history_page_details_ip_location_props_per_page_div <-
+  randoms_revision_history_page_details_ip_location_props_per_page %>%
+  group_by(page) %>%
+  summarise(shannon = vegan::diversity(n))
 
 ggplot(randoms_revision_history_page_details_ip_location_props_per_page_div,
        aes( shannon)) +
-  geom_histogram() 
+  geom_histogram()
 ```
 
 
 ```{r}
 # analyse the countries of IP address vs country of WH site
-revision_history_page_details_ip_addresses <- 
-revision_history_page_details %>% 
+revision_history_page_details_ip_addresses <-
+revision_history_page_details %>%
   mutate(edits_from_ip_addresses = map(revision_history_page_details,
-                          ~.x %>% 
-                            filter(get_ip_addresses(rh_user) != "") %>% 
-                            mutate(ip_location = map(rh_user, 
-                                                     ~maxmind(.x, ip_db)))  %>% 
-                            unnest(ip_location))) 
-                            
-revision_history_page_details_ip_addresses_df <- 
-revision_history_page_details_ip_addresses %>% 
-  unnest(edits_from_ip_addresses) 
+                          ~.x %>%
+                            filter(get_ip_addresses(rh_user) != "") %>%
+                            mutate(ip_location = map(rh_user,
+                                                     ~maxmind(.x, ip_db)))  %>%
+                            unnest(ip_location)))
 
-revision_history_page_details_ip_addresses_countries <- 
-revision_history_page_details_ip_addresses_df %>% 
-  select(Site, Country, country_name, rh_n_edits ) %>% 
-  filter_all(all_vars(!is.na(.))) %>% 
-  group_by(Site, Country, rh_n_edits) %>% 
-  count(country_name) %>% 
-  mutate(prop_anon_of_all_edits = n / rh_n_edits) %>% 
-  mutate(internal_edits = ifelse(Country ==  country_name, 
+revision_history_page_details_ip_addresses_df <-
+revision_history_page_details_ip_addresses %>%
+  unnest(edits_from_ip_addresses)
+
+revision_history_page_details_ip_addresses_countries <-
+revision_history_page_details_ip_addresses_df %>%
+  select(Site, Country, country_name, rh_n_edits ) %>%
+  filter_all(all_vars(!is.na(.))) %>%
+  group_by(Site, Country, rh_n_edits) %>%
+  count(country_name) %>%
+  mutate(prop_anon_of_all_edits = n / rh_n_edits) %>%
+  mutate(internal_edits = ifelse(Country ==  country_name,
                                  TRUE, FALSE),
-         n_anon_edits_total = n) %>% 
-  left_join(revision_history_page_details_ip_addresses_df) %>% 
+         n_anon_edits_total = n) %>%
+  left_join(revision_history_page_details_ip_addresses_df) %>%
   distinct(Site,  
-           Country, 
-           prop_anon_of_all_edits, 
+           Country,
+           prop_anon_of_all_edits,
            internal_edits,
-           .keep_all = TRUE) %>% 
-  group_by(Site,  Country) %>% 
+           .keep_all = TRUE) %>%
+  group_by(Site,  Country) %>%
   summarise(sum_prop_internal = sum(n_anon_edits_total[internal_edits]) / sum(n_anon_edits_total),
             sum_prop_external = 1 - sum_prop_internal,
             rh_n_edits = unique(rh_n_edits),
@@ -1505,7 +1506,7 @@ revision_history_page_details_ip_addresses_df %>%
 
 
 ```{r}
-# Histogram of proportion of anonymous edits 
+# Histogram of proportion of anonymous edits
 # TODO and random sites
 ggplot(revision_history_page_details_ip_addresses_countries,
        aes(prop_anon_of_all_edits)) +
@@ -1521,7 +1522,7 @@ ggsave("figures/wh_wikipedia_pages_anon_edits_prop.png")
 ggplot(revision_history_page_details_ip_addresses_countries,
        aes(sum_prop_internal)) +
   geom_histogram() +
-  theme_minimal() 
+  theme_minimal()
 ```
 
 
@@ -1538,40 +1539,40 @@ ggplot(revision_history_page_details_ip_addresses_countries,
 ## Circular chord plot
 
 ```{r}
-adjacency_list_3_cols <- 
-revision_history_page_details_ip_addresses_df %>% 
+adjacency_list_3_cols <-
+revision_history_page_details_ip_addresses_df %>%
   filter(!is.na(Country),
-         !is.na(country_name)) %>% 
-  group_by(Country, country_name) %>% 
-  count() %>% 
+         !is.na(country_name)) %>%
+  group_by(Country, country_name) %>%
+  count() %>%
   rename(to = Country,
          from = country_name,
-         value = n) %>% 
-  ungroup() %>% 
-  mutate(from = ifelse(from == "Hashemite Kingdom of Jordan", "Jordan", from)) %>% 
-  select(from, to , value) %>% 
-  filter(value > 100) %>% 
-  left_join( revision_history_page_details_ip_addresses_df %>% 
-               select(country_name, continent_name) %>% 
+         value = n) %>%
+  ungroup() %>%
+  mutate(from = ifelse(from == "Hashemite Kingdom of Jordan", "Jordan", from)) %>%
+  select(from, to , value) %>%
+  filter(value > 100) %>%
+  left_join( revision_history_page_details_ip_addresses_df %>%
+               select(country_name, continent_name) %>%
                distinct(),
-             by = c('from' = 'country_name')) %>% 
-  arrange(continent_name,  from, to) 
+             by = c('from' = 'country_name')) %>%
+  arrange(continent_name,  from, to)
 
 
-adjacency_list <- 
-adjacency_list_3_cols%>% 
+adjacency_list <-
+adjacency_list_3_cols%>%
   select(-continent_name)
 
 get_countries_in_continent <- function(x) {
-  
-  xx <- 
-  revision_history_page_details_ip_addresses_df %>% 
-    select(country_name, continent_name) %>% 
-    filter(continent_name == x) %>% 
-    pull(country_name) %>% 
+
+  xx <-
+  revision_history_page_details_ip_addresses_df %>%
+    select(country_name, continent_name) %>%
+    filter(continent_name == x) %>%
+    pull(country_name) %>%
     unique()
-  
-  
+
+
   xx[
  unique( c(adjacency_list$from,
            adjacency_list$to))
@@ -1582,23 +1583,23 @@ africa   <- get_countries_in_continent("Africa")
 asia    <- get_countries_in_continent("Asia")       
 europe  <-get_countries_in_continent("Europe")  
 north_america  <- get_countries_in_continent("North America")         
-oceania <-  get_countries_in_continent("Oceania") 
-south_america  <-  get_countries_in_continent("South America") 
+oceania <-  get_countries_in_continent("Oceania")
+south_america  <-  get_countries_in_continent("South America")
 
 library(circlize)
 circos.clear()
 png("figures/chord_fig.png", res = 300, width = 2500, height = 2500)
-chordDiagram(adjacency_list, 
+chordDiagram(adjacency_list,
              directional = 1,
              direction.type = c("diffHeight", "arrows"),
-             link.arr.type = "big.arrow", 
+             link.arr.type = "big.arrow",
              diffHeight = -uh(2, "mm"),
-             annotationTrack = "grid", 
+             annotationTrack = "grid",
              preAllocateTracks = list(track.height = max(0.4)))
 
 # we go back to the first track and customize sector labels
 circos.track(track.index = 1, panel.fun = function(x, y) {
-    circos.text(CELL_META$xcenter, CELL_META$ylim[1], CELL_META$sector.index, 
+    circos.text(CELL_META$xcenter, CELL_META$ylim[1], CELL_META$sector.index,
         facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5))
 }, bg.border = NA) # here set bg.border to NA is important
 
@@ -1610,25 +1611,25 @@ dev.off()
 
 # stuff that doesn't work
 
-highlight.sector(africa, track.index = 1, col = "#00FF0040", 
+highlight.sector(africa, track.index = 1, col = "#00FF0040",
     text = "Africa", cex = 0.8, text.col = "white", niceFacing = TRUE)
 
-highlight.sector(asia, track.index = 1, col = "#0000FF40", 
+highlight.sector(asia, track.index = 1, col = "#0000FF40",
     text = "Asia", cex = 0.8, text.col = "white", niceFacing = TRUE)
 
-highlight.sector(europe, track.index = 1, col = "blue", 
+highlight.sector(europe, track.index = 1, col = "blue",
     text = "Europe", cex = 0.8, text.col = "white", niceFacing = TRUE)
 
-highlight.sector(north_america, track.index = 1, col = "orange", 
+highlight.sector(north_america, track.index = 1, col = "orange",
     text = "North America", cex = 0.8, text.col = "white", niceFacing = TRUE)
 
-highlight.sector(oceania, track.index = 1, col = "purple", 
+highlight.sector(oceania, track.index = 1, col = "purple",
     text = "Oceania", cex = 0.8, text.col = "white", niceFacing = TRUE)
 
-highlight.sector(south_america, track.index = 1, col = "brown", 
+highlight.sector(south_america, track.index = 1, col = "brown",
     text = "South America", cex = 0.8, text.col = "white", niceFacing = TRUE)
 
-#-- 
+#--
 circos.track(track.index = 2, panel.fun = function(x, y) {
     sector.index = get.cell.meta.data("sector.index")
     xlim = get.cell.meta.data("xlim")
@@ -1648,7 +1649,7 @@ chordDiagram(adjacency_list, annotationTrack = c("grid", "axis"),
         track.height = uh(4, "mm"),
         track.margin = c(uh(4, "mm"), 0)
 ))             
-             
+
 circos.track(track.index = 2, panel.fun = function(x, y) {
     sector.index = get.cell.meta.data("sector.index")
     xlim = get.cell.meta.data("xlim")
@@ -1656,24 +1657,24 @@ circos.track(track.index = 2, panel.fun = function(x, y) {
     circos.text(mean(xlim), mean(ylim), sector.index, cex = 0.6, niceFacing = TRUE)
 }, bg.border = NA)
 
-highlight.sector(africa, track.index = 1, col = "red", 
+highlight.sector(africa, track.index = 1, col = "red",
     text = "Africa", cex = 0.8, text.col = "white", niceFacing = TRUE)
 
-highlight.sector(asia, track.index = 1, col = "green", 
+highlight.sector(asia, track.index = 1, col = "green",
     text = "Asia", cex = 0.8, text.col = "white", niceFacing = TRUE)
 
-highlight.sector(europe, track.index = 1, col = "blue", 
+highlight.sector(europe, track.index = 1, col = "blue",
     text = "Europe", cex = 0.8, text.col = "white", niceFacing = TRUE)
 
-highlight.sector(north_america, track.index = 1, col = "orange", 
+highlight.sector(north_america, track.index = 1, col = "orange",
     text = "North America", cex = 0.8, text.col = "white", niceFacing = TRUE)
 
-highlight.sector(oceania, track.index = 1, col = "purple", 
+highlight.sector(oceania, track.index = 1, col = "purple",
     text = "Oceania", cex = 0.8, text.col = "white", niceFacing = TRUE)
 
-highlight.sector(south_america, track.index = 1, col = "brown", 
+highlight.sector(south_america, track.index = 1, col = "brown",
     text = "South America", cex = 0.8, text.col = "white", niceFacing = TRUE)
-  
+
 
 ```
 
@@ -1701,15 +1702,15 @@ ggplot(ten_k_random_wp_pages,
 What are the keywords for controversy in edit messages? And how common are these warring messages?
 
 ```{r}
-randoms_revision_history_page_details_ip_warring_words <- 
-randoms_revision_history_page_details_ip %>% 
+randoms_revision_history_page_details_ip_warring_words <-
+randoms_revision_history_page_details_ip %>%
   mutate(warring_words = (str_detect(rh_comment, 'undid|vandalism|why|inaccurate|wrong|warning|blocked|warring|disputed|neutral|unacceptable' )))
 
 # distribution of edits with warring words
-randoms_revision_history_page_details_ip_warring_words_prop <- 
-randoms_revision_history_page_details_ip_warring_words %>% 
-  group_by(page) %>% 
-  summarise(prop_warring_edits = sum(warring_words) / n()) 
+randoms_revision_history_page_details_ip_warring_words_prop <-
+randoms_revision_history_page_details_ip_warring_words %>%
+  group_by(page) %>%
+  summarise(prop_warring_edits = sum(warring_words) / n())
 
 ggplot(randoms_revision_history_page_details_ip_warring_words_prop,
          aes(prop_warring_edits)) +
@@ -1721,11 +1722,11 @@ Is there are correlation between the proportion of warring words and talk page l
 
 ```{r}
 # some interesting groupings
-randoms_revision_history_page_details_ip_warring_words_prop %>% 
-  left_join(ten_k_random_wp_pages %>% 
-  mutate(page = 1:nrow(.))) %>% 
-  filter(prop_warring_edits > 0) %>% 
-  ggplot(aes(prop_warring_edits, 
+randoms_revision_history_page_details_ip_warring_words_prop %>%
+  left_join(ten_k_random_wp_pages %>%
+  mutate(page = 1:nrow(.))) %>%
+  filter(prop_warring_edits > 0) %>%
+  ggplot(aes(prop_warring_edits,
              talk_page_wordcount ,
              size = page_wordcount)) +
   geom_point(alpha = 0.2)
@@ -1734,18 +1735,18 @@ randoms_revision_history_page_details_ip_warring_words_prop %>%
 Is there are correlation between the proportion of warring words and revert frequency?
 
 ```{r}
-randoms_revision_history_page_details_ip_warring_words_prop_revert_prop <- 
-randoms_revision_history_page_details_ip_warring_words_prop %>% 
-  left_join(ten_k_random_wp_pages %>% 
-  mutate(page = 1:nrow(.))) %>% 
+randoms_revision_history_page_details_ip_warring_words_prop_revert_prop <-
+randoms_revision_history_page_details_ip_warring_words_prop %>%
+  left_join(ten_k_random_wp_pages %>%
+  mutate(page = 1:nrow(.))) %>%
   filter(prop_warring_edits != 0,
-         rh_revert_prop != 0) 
+         rh_revert_prop != 0)
 
-lm(rh_revert_prop ~ prop_warring_edits, 
+lm(rh_revert_prop ~ prop_warring_edits,
    data = randoms_revision_history_page_details_ip_warring_words_prop_revert_prop) %>% summary
 
 ggplot(randoms_revision_history_page_details_ip_warring_words_prop_revert_prop,
-         aes(prop_warring_edits, 
+         aes(prop_warring_edits,
              rh_revert_prop)) +
   geom_point()
 ```
@@ -1754,43 +1755,43 @@ ggplot(randoms_revision_history_page_details_ip_warring_words_prop_revert_prop,
 
 ```{r}
 library(lubridate)
-randoms_revision_history_page_details_ip_time_diffs <- 
-randoms_revision_history_page_details_ip %>% 
-  group_nest(page) %>% 
-  mutate(time_diff = map(data, ~lag(.x$rh_date) - .x$rh_date)) %>% 
-  unnest(time_diff) %>% 
-  mutate(time_diff_days = as.numeric(time_diff / 60 / 60 / 24)) %>% 
-  mutate(time_diff_hours = as.numeric(time_diff / 60 / 60 )) %>% 
-  mutate(less_than_one_month = ifelse(time_diff_hours < 744, TRUE, FALSE)) %>% 
-  mutate(less_than_one_week = ifelse(time_diff_hours < 168, TRUE, FALSE)) %>% 
+randoms_revision_history_page_details_ip_time_diffs <-
+randoms_revision_history_page_details_ip %>%
+  group_nest(page) %>%
+  mutate(time_diff = map(data, ~lag(.x$rh_date) - .x$rh_date)) %>%
+  unnest(time_diff) %>%
+  mutate(time_diff_days = as.numeric(time_diff / 60 / 60 / 24)) %>%
+  mutate(time_diff_hours = as.numeric(time_diff / 60 / 60 )) %>%
+  mutate(less_than_one_month = ifelse(time_diff_hours < 744, TRUE, FALSE)) %>%
+  mutate(less_than_one_week = ifelse(time_diff_hours < 168, TRUE, FALSE)) %>%
   bind_cols(randoms_revision_history_page_details_ip)  
 
-rle_tbl <- 
+rle_tbl <-
 tibble(lths = rle(randoms_revision_history_page_details_ip_time_diffs$rh_user)$lengths,
-vals = rle(randoms_revision_history_page_details_ip_time_diffs$rh_user)$values) 
+vals = rle(randoms_revision_history_page_details_ip_time_diffs$rh_user)$values)
 
 rle_tbl2 <- tibble(
   rh_user = rep(rle_tbl$vals, rle_tbl$lths),
   lths2 = rep(rle_tbl$lths, rle_tbl$lths)
 )
 
-randoms_revision_history_page_details_ip_time_diffs %>% 
-  filter(!is.na(time_diff_hours)) %>% 
+randoms_revision_history_page_details_ip_time_diffs %>%
+  filter(!is.na(time_diff_hours)) %>%
   mutate(quick_three_edits = time_diff_hours + lag(time_diff_hours) + lag(time_diff_hours, 2) + lag(time_diff_hours, 3))
 
-randoms_revision_history_page_details_ip_time_diffs_quick <- 
-randoms_revision_history_page_details_ip_time_diffs %>% 
+randoms_revision_history_page_details_ip_time_diffs_quick <-
+randoms_revision_history_page_details_ip_time_diffs %>%
  nest(-page) %>%  
- mutate(edits_3 = map(data, ~.x %>% 
-                              filter(less_than_one_week) %>% 
-                              filter(n() > 4 ))) %>% 
+ mutate(edits_3 = map(data, ~.x %>%
+                              filter(less_than_one_week) %>%
+                              filter(n() > 4 ))) %>%
   unnest(edits_3)
 
-randoms_revision_history_page_details_ip_time_diffs %>% 
-  bind_cols(rle_tbl2) %>% 
-  filter(lths2 == 1) %>% 
-  filter(time_diff_hours < 24) 
-  
+randoms_revision_history_page_details_ip_time_diffs %>%
+  bind_cols(rle_tbl2) %>%
+  filter(lths2 == 1) %>%
+  filter(time_diff_hours < 24)
+
 ggplot(randoms_revision_history_page_details_ip_time_diffs,
        aes(time_diff_days)) +
   geom_histogram()
@@ -1805,47 +1806,47 @@ ggplot(randoms_revision_history_page_details_ip_time_diffs,
 ```{r}
 # get first and last edit, and inscription year
 library(lubridate)
-page_data_for_all_pages_rh_tbl_edit_start_end_span <- 
-page_data_for_all_pages_rh_tbl %>% 
-  group_by(Site) %>% 
+page_data_for_all_pages_rh_tbl_edit_start_end_span <-
+page_data_for_all_pages_rh_tbl %>%
+  group_by(Site) %>%
   summarise(first_edit_date = min(rh_date),
             last_edit_date = max(rh_date),
-            edit_span = last_edit_date - first_edit_date) %>% 
-  mutate(Site = as.numeric(Site)) %>% 
-  arrange(Site) %>% 
-  bind_cols(page_data_for_all_pages) %>% 
-  mutate(inscription_year = as.Date(ISOdate(Year_num, 1, 1))) %>% 
+            edit_span = last_edit_date - first_edit_date) %>%
+  mutate(Site = as.numeric(Site)) %>%
+  arrange(Site) %>%
+  bind_cols(page_data_for_all_pages) %>%
+  mutate(inscription_year = as.Date(ISOdate(Year_num, 1, 1))) %>%
   mutate(diff_first_edit_inscription_year = as.numeric( as.POSIXlt(inscription_year) - ymd_hms(first_edit_date) ) / 365 )
 
-page_data_for_random_rh_tbl_edit_start_end_span <- 
-randoms_revision_history_page_details %>% 
-  group_by(page) %>% 
+page_data_for_random_rh_tbl_edit_start_end_span <-
+randoms_revision_history_page_details %>%
+  group_by(page) %>%
   summarise(first_edit_date = min(rh_date),
             last_edit_date = max(rh_date),
-            edit_span = last_edit_date - first_edit_date) %>% 
-  mutate(page = as.numeric(page)) %>% 
-  arrange(page) 
+            edit_span = last_edit_date - first_edit_date) %>%
+  mutate(page = as.numeric(page)) %>%
+  arrange(page)
 
 bind_rows(
-  
-  page_data_for_all_pages_rh_tbl_edit_start_end_span %>% 
-    select(edit_span) %>% 
+
+  page_data_for_all_pages_rh_tbl_edit_start_end_span %>%
+    select(edit_span) %>%
     mutate(source = "World Heritage"),
-  
-  page_data_for_random_rh_tbl_edit_start_end_span %>% 
-     select(edit_span) %>% 
+
+  page_data_for_random_rh_tbl_edit_start_end_span %>%
+     select(edit_span) %>%
     mutate(source = "Random")
-  
-) %>% 
+
+) %>%
   ggplot() +
-geom_density(aes(as.numeric(edit_span / 365), 
+geom_density(aes(as.numeric(edit_span / 365),
                  fill = source),
                  alpha = 0.3) +
-  geom_vline(xintercept = year(Sys.Date()) - 2001, 
+  geom_vline(xintercept = year(Sys.Date()) - 2001,
              colour = "red") +
   annotate("text", x = 15, y = 0.2, label = "start of Wikipedia → ") +
   scale_fill_viridis_d() +  
-  theme_minimal(base_size = 12) + 
+  theme_minimal(base_size = 12) +
   xlab("Age of Wikipedia page (years)")
 
 ggsave("figures/wh_wikpedia_pages_ages.png")
@@ -1856,27 +1857,27 @@ ggsave("figures/wh_wikpedia_pages_ages.png")
 ```{r}
 
 ggplot(page_data_for_all_pages_rh_tbl_edit_start_end_span,
-       aes(Year_num, 
+       aes(Year_num,
            diff_first_edit_inscription_year)) +
   geom_jitter(alpha =  0.1, size = 3)  +
   geom_vline(xintercept = 2001, colour = "red") +
   geom_hline(yintercept = 0, colour = "red") +
-  theme_minimal(base_size = 12) + 
+  theme_minimal(base_size = 12) +
   xlab("Year of inscription on World Heritage list") +
   ylab("Difference between year of\ninscriptionand first edit on Wikipedia")
 
 ggplot(page_data_for_all_pages_rh_tbl_edit_start_end_span,
-       aes(Year_num, 
+       aes(Year_num,
            first_edit_date)) +
   geom_jitter(alpha =  0.1, size = 3) +
-  theme_minimal(base_size = 12) + 
+  theme_minimal(base_size = 12) +
   xlab("Year of inscription on World Heritage list") +
   ylab("first edit on Wikipedia")
 
 
 ggplot(page_data_for_all_pages_rh_tbl_edit_start_end_span,
        aes(Year_num)) +
-  geom_histogram() + 
+  geom_histogram() +
   theme_minimal(base_size = 12) +
   scale_x_continuous(breaks = seq(1975, 2019, 1)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
@@ -1884,7 +1885,7 @@ ggplot(page_data_for_all_pages_rh_tbl_edit_start_end_span,
 
 ggsave("figures/wh_wikpedia_pages_inscription_year_hist.png")
 
-ggplot(page_data_for_all_pages_rh_tbl_edit_start_end_span, 
+ggplot(page_data_for_all_pages_rh_tbl_edit_start_end_span,
        aes(diff_first_edit_inscription_year)) +
   geom_histogram() +
   theme_minimal(base_size = 12)  +
@@ -1894,11 +1895,11 @@ ggplot(page_data_for_all_pages_rh_tbl_edit_start_end_span,
   ylim(0, 70) +
   annotate("text", x = 10, y = 59, label = "Page appeared\nbefore inscription\n→", size =8) +
   annotate("text", x =-10,  y = 59, label = "Page appeared\nafter inscription\n←", size = 8) +
-  annotate("text", x =-22,  y = 5, label = "Inscribed in 1983→", 
+  annotate("text", x =-22,  y = 5, label = "Inscribed in 1983→",
            size = 3, colour = "white", hjust = 1  ) +
-  annotate("text", x =-10,  y = 5, label = "Inscribed in 1994→", 
+  annotate("text", x =-10,  y = 5, label = "Inscribed in 1994→",
            size = 3, colour = "white", hjust = 1 ) +
-  annotate("text", x =0,  y = 5, label = "Inscribed in 2001→", 
+  annotate("text", x =0,  y = 5, label = "Inscribed in 2001→",
            size = 3, colour = "white", hjust = 1 ) +
   xlab("Difference between year of inscription on World Heritage list and first edit on Wikipedia")
 
@@ -1907,7 +1908,7 @@ ggsave("figures/wh_wikpedia_pages_diff_time_inscription.png")
 ```
 
 
-# reload data 
+# reload data
 
 `all_the_data_to_load_quickly.RData` is up to here
 
@@ -1922,20 +1923,20 @@ library(lubridate)
 
 
 ## time series of edits: breakouts relating to events? monthly seems like a good level of aggregation. What can we do for spike detection?
- 
+
 ```{r}
-wh_pages_edit_time_series <- 
-wh_pages_talk_page_length %>% 
-  unnest(revision_history_page_details) %>% 
+wh_pages_edit_time_series <-
+wh_pages_talk_page_length %>%
+  unnest(revision_history_page_details) %>%
   filter(Year_num >= 2001) %>% # only sites inscribed after WP started
-  group_by(Site) %>% 
-  mutate(the_d = floor_date(rh_date, "day")) %>% 
-    mutate(the_m = floor_date(rh_date, "month")) %>% 
-  group_by(Site, the_m) %>% 
-  tally() %>% 
+  group_by(Site) %>%
+  mutate(the_d = floor_date(rh_date, "day")) %>%
+    mutate(the_m = floor_date(rh_date, "month")) %>%
+  group_by(Site, the_m) %>%
+  tally() %>%
   filter(n() > 100) %>% # explore this value
-  left_join(wh_pages_talk_page_length) %>% 
-  mutate(vline_year = ifelse(Year_num >= 2001, Year_num, NA)) %>% 
+  left_join(wh_pages_talk_page_length) %>%
+  mutate(vline_year = ifelse(Year_num >= 2001, Year_num, NA)) %>%
   mutate(vline_year = ymd_hms(ISOdatetime(vline_year, 1, 1, 1, 0, 0)))
 
 ggplot(wh_pages_edit_time_series) +
@@ -1950,56 +1951,56 @@ ggsave("figures/wh_wikpedia_pages_edit_time_series.png", h = 9, w = 12)
 
 ## Spike detection
 
-for randoms, what even is an anomaly? 
+for randoms, what even is an anomaly?
 
 ```{r}
 # devtools::install_github("hrbrmstr/AnomalyDetection")
 library(AnomalyDetection)
-randoms_revision_history_page_details_ip_location_monthly <- 
-randoms_revision_history_page_details_ip_location %>% 
-  group_by(page) %>% 
-  mutate(the_d = floor_date(rh_date, "day")) %>% 
-    mutate(the_m = floor_date(rh_date, "month")) %>% 
-  group_by(page, the_m) %>% 
-  tally() %>% 
+randoms_revision_history_page_details_ip_location_monthly <-
+randoms_revision_history_page_details_ip_location %>%
+  group_by(page) %>%
+  mutate(the_d = floor_date(rh_date, "day")) %>%
+    mutate(the_m = floor_date(rh_date, "month")) %>%
+  group_by(page, the_m) %>%
+  tally() %>%
   filter(n() > 200) # explore this value
 
-randoms_revision_history_page_details_ip_location_monthly_anom <- 
-  randoms_revision_history_page_details_ip_location_monthly %>% 
-  ungroup %>% 
-  group_nest(page) %>% 
-  mutate(anomalies = map(data, ~ad_ts(.x, 
-                                      max_anoms = 0.2, 
+randoms_revision_history_page_details_ip_location_monthly_anom <-
+  randoms_revision_history_page_details_ip_location_monthly %>%
+  ungroup %>%
+  group_nest(page) %>%
+  mutate(anomalies = map(data, ~ad_ts(.x,
+                                      max_anoms = 0.2,
                                       alpha = 0.005,
-                                      threshold = "p95"))) %>% 
+                                      threshold = "p95"))) %>%
   unnest(anomalies)
 
 ggplot() +
   geom_line(
-    data=randoms_revision_history_page_details_ip_location_monthly %>% 
-      filter(page %in% randoms_revision_history_page_details_ip_location_monthly_anom$page), 
-    aes(the_m, n), 
+    data=randoms_revision_history_page_details_ip_location_monthly %>%
+      filter(page %in% randoms_revision_history_page_details_ip_location_monthly_anom$page),
+    aes(the_m, n),
     size=0.125, color="lightslategray")  +
   geom_point(
-    data=randoms_revision_history_page_details_ip_location_monthly_anom, 
-    aes(timestamp, anoms), 
+    data=randoms_revision_history_page_details_ip_location_monthly_anom,
+    aes(timestamp, anoms),
     color="#cb181d", alpha=1/3) +
   scale_x_datetime(date_labels="%b\n%Y") +
   facet_wrap( ~ page, scales = "free_y")
-  
+
 ```
 
-for WH sites, look for editing anomalies using all editors, put a line on for inscpription year so we can see if there are peaks in activity around inscription. 
+for WH sites, look for editing anomalies using all editors, put a line on for inscpription year so we can see if there are peaks in activity around inscription.
 
 ```{r}
 
 n <- 12 # months of edit data
-revision_history_page_details_ip_addresses_df_monthly_edits <- 
-revision_history_page_details_ip_addresses_df  %>% 
-  mutate(the_d = floor_date(rh_date, "day")) %>% 
-    mutate(the_m = floor_date(rh_date, "month")) %>% 
-  group_by(Site, the_m) %>% 
-  tally() %>% 
+revision_history_page_details_ip_addresses_df_monthly_edits <-
+revision_history_page_details_ip_addresses_df  %>%
+  mutate(the_d = floor_date(rh_date, "day")) %>%
+    mutate(the_m = floor_date(rh_date, "month")) %>%
+  group_by(Site, the_m) %>%
+  tally() %>%
   filter(n() >  n ) # n months worth of data - explore this value
 
 # distribution of edits per month
@@ -2012,39 +2013,39 @@ ggplot(revision_history_page_details_ip_addresses_df_monthly_edits,
 
 n1 <- 10  # edits per month
 n2 <- 12 # months worth of edits
-revision_history_page_details_ip_addresses_df_monthly_edits_10 <- 
-revision_history_page_details_ip_addresses_df_monthly_edits %>% 
-  filter(max(n) >= n1) %>% 
-  group_by(Site) %>% 
-  filter(n() >= n2) 
+revision_history_page_details_ip_addresses_df_monthly_edits_10 <-
+revision_history_page_details_ip_addresses_df_monthly_edits %>%
+  filter(max(n) >= n1) %>%
+  group_by(Site) %>%
+  filter(n() >= n2)
 ```
 
-Anomalies in editing activity 
+Anomalies in editing activity
 
 ```{r}
 
 # detect anomalies
-revision_history_page_details_ip_addresses_df_monthly_edits_anoms <- 
-  revision_history_page_details_ip_addresses_df_monthly_edits_10 %>% 
-  ungroup %>% 
-  group_nest(Site) %>% 
-  mutate(anomalies = map(data, ~ad_ts(.x, 
-                                      max_anoms = 0.2, 
+revision_history_page_details_ip_addresses_df_monthly_edits_anoms <-
+  revision_history_page_details_ip_addresses_df_monthly_edits_10 %>%
+  ungroup %>%
+  group_nest(Site) %>%
+  mutate(anomalies = map(data, ~ad_ts(.x,
+                                      max_anoms = 0.2,
                                       alpha = 0.005,
-                                      threshold = "p95"))) %>% 
-  unnest(anomalies) %>% 
-  group_by(Site) %>% 
+                                      threshold = "p95"))) %>%
+  unnest(anomalies) %>%
+  group_by(Site) %>%
   filter(max(anoms) >= 50) # where the anomaly is n edits/month or more
 
 ggplot() +
   geom_line(
-    data=revision_history_page_details_ip_addresses_df_monthly_edits_10 %>% 
-      filter(Site %in% revision_history_page_details_ip_addresses_df_monthly_edits_anoms$Site), 
-    aes(the_m, n), 
+    data=revision_history_page_details_ip_addresses_df_monthly_edits_10 %>%
+      filter(Site %in% revision_history_page_details_ip_addresses_df_monthly_edits_anoms$Site),
+    aes(the_m, n),
     size=0.125, color="lightslategray")  +
   geom_point(
-    data=revision_history_page_details_ip_addresses_df_monthly_edits_anoms, 
-    aes(timestamp, anoms), 
+    data=revision_history_page_details_ip_addresses_df_monthly_edits_anoms,
+    aes(timestamp, anoms),
     color="#cb181d", alpha=1/3) +
   scale_x_datetime(date_labels="%b\n%Y") +
   facet_wrap( ~ Site, scales = "free") +
@@ -2053,22 +2054,21 @@ ggplot() +
 
 
 
-  - length of articles http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.451.4208&rep=rep1&type=pdf 
-  - edit history to identify: diversity of contributions, 
-  - reverts in edits for spotting contentious topics https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0038869 http://www.contropedia.net/  http://wwm.phy.bme.hu/ 
+  - length of articles http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.451.4208&rep=rep1&type=pdf
+  - edit history to identify: diversity of contributions,
+  - reverts in edits for spotting contentious topics https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0038869 http://www.contropedia.net/  http://wwm.phy.bme.hu/
     - vandalism traces in edit history
   - talk page length
   - number of links in each page
-  - page views: https://www.sciencedirect.com/science/article/abs/pii/S0006320716301240 
+  - page views: https://www.sciencedirect.com/science/article/abs/pii/S0006320716301240
   - timing of edits: political events? Brexit?
     - citations in articles: https://arxiv.org/abs/0705.2106
   - are the citations scholarly? Archaeological? Meskell?
-    - citations to these articles: https://www.tandfonline.com/doi/full/10.1080/0194262X.2016.1206052 
+    - citations to these articles: https://www.tandfonline.com/doi/full/10.1080/0194262X.2016.1206052
   - network analysis of editors, clusters of editors
   - sentiment analysis of talk pages
   - geolocation of anon editors by IP address
-  - bots and technicity https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0171774 but see https://dl.acm.org/citation.cfm?id=3134684 
-  
+  - bots and technicity https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0171774 but see https://dl.acm.org/citation.cfm?id=3134684
+
   - Compare to 10000 random Wikipedia sites
   - Compare to WH sites in media & academic literature
-  
